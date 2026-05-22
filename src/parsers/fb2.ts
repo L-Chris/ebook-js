@@ -44,10 +44,15 @@ const findAllByTag = (el: XMLElement, tagName: string): XMLElement[] => {
 }
 
 // ============================================================================
-// Default FB2 stylesheet
+// Default FB2 stylesheet (for renderers)
 // ============================================================================
 
-const FB2_STYLE = `
+/**
+ * Default stylesheet for FB2 content.
+ * Renderers can use this via `renderer.setStyles({ css: fb2DefaultStyles })`.
+ * Users can also provide their own styles instead.
+ */
+export const fb2DefaultStyles = `
 body > img, section > img {
     display: block;
     margin: auto;
@@ -592,10 +597,6 @@ export class FB2Parser implements Parser {
             }
         }
 
-        // Create stylesheet URL
-        const styleUrl = urlFactory.createURL(FB2_STYLE, 'text/css')
-        urls.push(styleUrl)
-
         // Build Book
         const book: Book = {
             sections,
@@ -657,7 +658,7 @@ function buildXHTMLDocument(el: XMLElement, bodyClass?: string): string {
 
     return `<?xml version="1.0" encoding="utf-8"?>
 <html xmlns="http://www.w3.org/1999/xhtml">
-<head><style type="text/css">${FB2_STYLE}</style></head>
+<head></head>
 <body${classAttr}>${content}</body>
 </html>`
 }

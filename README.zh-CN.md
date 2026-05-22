@@ -26,7 +26,7 @@ npm install ebook-js
 |------|--------|--------|------|
 | EPUB 2/3 | `.epub` | `EPUBParser` | 完整支持：导航、书脊、字体解密、landmarks |
 | Mobipocket / Kindle | `.mobi`、`.azw`、`.azw3` | `MOBIParser` | MOBI6 + KF8、PalmDOC + HUFF/CDIC、EXTH 元数据、NCX |
-| FictionBook 2 | `.fb2`、`.fbz`、`.fb2.zip` | `FB2Parser` | FB2 XML 转 XHTML、FBZ 归档支持 |
+| FictionBook 2 | `.fb2`、`.fbz`、`.fb2.zip` | `FB2Parser` | FB2 XML 转 XHTML、FBZ 归档支持（渲染时使用 `fb2DefaultStyles`） |
 | Comic Book Zip | `.cbz` | `CBZParser` | 从 zip 归档中读取顺序图片 |
 
 ## 快速开始
@@ -336,6 +336,35 @@ import {
     normalizeContributors,
     normalizeSubjects,
 } from 'ebook-js'
+```
+
+## FB2 样式
+
+与 EPUB 和 MOBI 不同，FB2 是纯 XML 格式，不包含样式信息。解析器将 FB2 转换为干净的 XHTML，不嵌入任何 CSS。
+
+要为 FB2 内容应用正确的样式，使用导出的默认样式表：
+
+```typescript
+import { fb2DefaultStyles } from 'ebook-js'
+
+// 将默认 FB2 样式应用到渲染器
+reader.setStyles({ css: fb2DefaultStyles })
+```
+
+你也可以自定义或替换样式：
+
+```typescript
+// 使用自定义 FB2 样式
+reader.setStyles({ css: `
+    .title h1 { text-align: center; font-size: 1.5em; }
+    p { text-indent: 1.5em; }
+    .stanza { margin: 2em 0; }
+` })
+
+// 或结合默认样式与自定义覆盖
+reader.setStyles({ css: fb2DefaultStyles + `
+    p { color: #333; }
+` })
 ```
 
 ## 畸形 EPUB 处理

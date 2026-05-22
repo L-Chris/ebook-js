@@ -382,7 +382,7 @@
         } from '../src/index.ts'
         import { epub } from '../src/parsers/epub.ts'
         import { cbz } from '../src/parsers/cbz.ts'
-        import { fb2 } from '../src/parsers/fb2.ts'
+        import { fb2, fb2DefaultStyles } from '../src/parsers/fb2.ts'
         import { mobi } from '../src/parsers/mobi.ts'
 
         // Create shared adapters for all parsers
@@ -459,6 +459,13 @@
         const openFile = async (file) => {
             try {
                 dropTarget.classList.add('hidden')
+
+                // Detect FB2 files and apply default styles
+                const isFB2 = file.name.toLowerCase().match(/\.(fb2|fbz|fb2\.zip)$/)
+                if (isFB2) {
+                    reader.setStyles({ css: fb2DefaultStyles })
+                }
+
                 const book = await reader.open(file)
 
                 // Update UI

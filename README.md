@@ -28,7 +28,7 @@ npm install ebook-js
 |--------|-----------|--------|-------|
 | EPUB 2/3 | `.epub` | `EPUBParser` | Full support: navigation, spine, font deobfuscation, landmarks |
 | Mobipocket / Kindle | `.mobi`, `.azw`, `.azw3` | `MOBIParser` | MOBI6 + KF8, PalmDOC + HUFF/CDIC, EXTH metadata, NCX |
-| FictionBook 2 | `.fb2`, `.fbz`, `.fb2.zip` | `FB2Parser` | FB2 XML to XHTML conversion, FBZ archive support |
+| FictionBook 2 | `.fb2`, `.fbz`, `.fb2.zip` | `FB2Parser` | FB2 XML to XHTML conversion, FBZ archive support (use `fb2DefaultStyles` for rendering) |
 | Comic Book Zip | `.cbz` | `CBZParser` | Sequential images from zip archives |
 
 ## Quick Start
@@ -341,6 +341,35 @@ import {
     normalizeContributors,
     normalizeSubjects,
 } from 'ebook-js'
+```
+
+## FB2 Styles
+
+Unlike EPUB and MOBI which have embedded stylesheets, FB2 is a pure XML format without styling information. The parser converts FB2 to clean XHTML without any CSS.
+
+To render FB2 content with proper styling, use the exported default stylesheet:
+
+```typescript
+import { fb2DefaultStyles } from 'ebook-js'
+
+// Apply default FB2 styles to the renderer
+reader.setStyles({ css: fb2DefaultStyles })
+```
+
+You can also customize or replace the styles entirely:
+
+```typescript
+// Use custom FB2 styles
+reader.setStyles({ css: `
+    .title h1 { text-align: center; font-size: 1.5em; }
+    p { text-indent: 1.5em; }
+    .stanza { margin: 2em 0; }
+` })
+
+// Or combine default with custom overrides
+reader.setStyles({ css: fb2DefaultStyles + `
+    p { color: #333; }
+` })
 ```
 
 ## Malformed EPUB Handling
