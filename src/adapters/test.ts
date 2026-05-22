@@ -323,6 +323,10 @@ class XmldomXMLDocument implements XMLDocument {
   lookupPrefix(ns: string): string | null {
     return this.doc.lookupPrefix(ns)
   }
+
+  toNative(): XmldomDocument {
+    return this.doc
+  }
 }
 
 /**
@@ -353,7 +357,8 @@ export class TestDOMAdapter implements DOMAdapter {
   }
 
   serialize(doc: XMLDocument): string {
-    const nativeDoc = (doc as XmldomXMLDocument)['doc']
+    const nativeDoc = doc.toNative?.() as XmldomDocument
+    if (!nativeDoc) throw new Error('XMLDocument does not support toNative()')
     const serializer = new this.XMLSerializer()
     return serializer.serializeToString(nativeDoc)
   }

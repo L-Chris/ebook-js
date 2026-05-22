@@ -127,6 +127,10 @@ class BrowserXMLDocument implements XMLDocument {
   lookupPrefix(ns: string): string | null {
     return this.doc.lookupPrefix(ns)
   }
+
+  toNative(): Document {
+    return this.doc
+  }
 }
 
 /**
@@ -151,8 +155,8 @@ export class BrowserDOMAdapter implements DOMAdapter {
   }
 
   serialize(doc: XMLDocument): string {
-    // Unwrap to get the native Document
-    const nativeDoc = (doc as BrowserXMLDocument)['doc']
+    const nativeDoc = doc.toNative?.() as Document
+    if (!nativeDoc) throw new Error('XMLDocument does not support toNative()')
     return this.serializer.serializeToString(nativeDoc)
   }
 }

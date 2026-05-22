@@ -38,6 +38,12 @@
   "keywords": [
     "ebook",
     "epub",
+    "mobi",
+    "azw3",
+    "kindle",
+    "fb2",
+    "cbz",
+    "comic",
     "reader",
     "parser",
     "renderer"
@@ -54,6 +60,7 @@
     "vitest": "^4.1.7"
   },
   "dependencies": {
-    "@zip.js/zip.js": "^2.7.52"
+    "@zip.js/zip.js": "^2.7.52",
+    "fflate": "^0.8.3"
   }
 }

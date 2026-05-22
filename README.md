@@ -10,8 +10,8 @@ Inspired by [foliate-js](https://github.com/johnfactotum/foliate-js), but restru
 
 - **Modular architecture**: Parsers and renderers are independent — mix and match
 - **TypeScript**: Full type safety with comprehensive interfaces
-- **EPUB support**: Full EPUB 2.x and 3.x parsing with metadata, TOC, and navigation
-- **Environment-agnostic parser**: EPUB parser runs in browser, Node.js, or workers via adapter injection
+- **Multi-format support**: EPUB 2.x/3.x, MOBI/AZW/AZW3, FictionBook 2, and CBZ
+- **Environment-agnostic parsers**: All parsers run in browser, Node.js, or workers via adapter injection
 - **Browser renderer**: Paginated and scrolled reading modes
 - **Progress tracking**: Section and TOC-level progress reporting
 - **Framework-agnostic**: Core library works with any framework; React/Vue wrappers coming
@@ -22,21 +22,36 @@ Inspired by [foliate-js](https://github.com/johnfactotum/foliate-js), but restru
 npm install ebook-js
 ```
 
+## Supported Formats
+
+| Format | Extensions | Parser | Notes |
+|--------|-----------|--------|-------|
+| EPUB 2/3 | `.epub` | `EPUBParser` | Full support: navigation, spine, font deobfuscation, landmarks |
+| Mobipocket / Kindle | `.mobi`, `.azw`, `.azw3` | `MOBIParser` | MOBI6 + KF8, PalmDOC + HUFF/CDIC, EXTH metadata, NCX |
+| FictionBook 2 | `.fb2`, `.fbz`, `.fb2.zip` | `FB2Parser` | FB2 XML to XHTML conversion, FBZ archive support |
+| Comic Book Zip | `.cbz` | `CBZParser` | Sequential images from zip archives |
+
 ## Quick Start
 
 ```typescript
 import { registry, createReader } from 'ebook-js'
 import { epub } from 'ebook-js/parsers/epub'
+import { mobi } from 'ebook-js/parsers/mobi'
+import { fb2 } from 'ebook-js/parsers/fb2'
+import { cbz } from 'ebook-js/parsers/cbz'
 
-// 1. Register parsers
+// 1. Register parsers for auto-detection
 registry.register('epub', epub)
+registry.register('mobi', mobi)
+registry.register('fb2', fb2)
+registry.register('cbz', cbz)
 
 // 2. Create reader
 const reader = createReader({
     container: document.getElementById('viewer')!,
 })
 
-// 3. Open a book (File, Blob, or URL)
+// 3. Open a book (auto-detects format)
 const book = await reader.open(file)
 
 // 4. Navigate
@@ -55,12 +70,15 @@ await reader.goTo('/path/to/chapter.xhtml#section')
 │                            │                                 │
 │  ┌──────────────────────┐  │  ┌───────────────────────────┐  │
 │  │  EPUB Parser         │  │  │  Browser Renderer         │  │
-│  │  (env-agnostic)      │  │  │  (paginated/scrolled)     │  │
-│  └──────────┬───────────┘  │  └───────────────────────────┘  │
-│             │              │  ┌───────────────────────────┐  │
-│  ┌──────────┴───────────┐  │  │  React/Vue Wrappers       │  │
-│  │  Adapters (injected) │  │  │  (planned)                │  │
-│  │  - DOMAdapter        │  │  └───────────────────────────┘  │
+│  │  MOBI/AZW3 Parser    │  │  │  (paginated/scrolled)     │  │
+│  │  FB2 Parser          │  │  └───────────────────────────┘  │
+│  │  CBZ Parser          │  │  ┌───────────────────────────┐  │
+│  │  (all env-agnostic)  │  │  │  React/Vue Wrappers       │  │
+│  └──────────┬───────────┘  │  │  (planned)                │  │
+│             │              │  └───────────────────────────┘  │
+│  ┌──────────┴───────────┐  │                                 │
+│  │  Adapters (injected) │  │                                 │
+│  │  - DOMAdapter        │  │                                 │
 │  │  - URLFactory        │  │                                 │
 │  └──────────────────────┘  │                                 │
 │                            │                                 │
@@ -73,7 +91,7 @@ await reader.goTo('/path/to/chapter.xhtml#section')
 
 ### Design Principles
 
-1. **Parsers are environment-agnostic**: The EPUB parser has no browser dependencies. DOM parsing and URL creation are injected via adapters.
+1. **Parsers are environment-agnostic**: Parsers have no browser dependencies. DOM parsing and URL creation are injected via adapters.
 2. **Renderers own the browser**: Browser-specific concerns (iframe, CSS columns, DOM events) live in renderers.
 3. **Book is the contract**: Parsers produce a `Book`, renderers consume it. Neither knows about the other.
 
@@ -197,6 +215,17 @@ const urlFactory = new TestURLFactory()
 const book = await registry.open(arrayBuffer, { domAdapter, urlFactory })
 ```
 
+## Malformed EPUB Handling
+
+Many EPUB files in the wild have structural issues in their zip archives — particularly incorrect Central Directory offsets that prevent standard zip libraries from reading entry data. ebook-js includes multiple fallback strategies to handle these files gracefully:
+
+1. **Prepended data correction** — Detects and corrects uniformly-shifted offsets (common in self-extracting archives or files with prepended data) by patching Central Directory entries before retrying.
+2. **Per-entry local header scanning** — When individual entries have incorrect offsets, scans the entire file for actual Local File Header positions and extracts data directly using `DecompressionStream`.
+3. **Full local-header-only fallback** — When the Central Directory is completely unreadable, builds the entry list and loader entirely from Local File Headers.
+4. **Graceful degradation** — Entries that cannot be recovered return `null` instead of throwing, allowing the rest of the book to load normally.
+
+This makes ebook-js significantly more resilient than raw `@zip.js/zip.js` or libraries like foliate-js when dealing with EPUB files produced by various authoring tools.
+
 ## API Reference
 
 ### Parser Registry
@@ -319,7 +348,10 @@ src/
 │   ├── browser.ts      # Browser DOM/URL adapters
 │   └── test.ts         # Node.js test adapters
 ├── parsers/
-│   └── epub.ts         # EPUB parser (env-agnostic)
+│   ├── epub.ts         # EPUB parser
+│   ├── mobi.ts         # MOBI/AZW/AZW3 parser
+│   ├── fb2.ts          # FictionBook 2 parser
+│   └── cbz.ts          # Comic Book Zip parser
 ├── loaders/
 │   └── zip-loader.ts   # Zip archive loader
 ├── renderers/
@@ -330,8 +362,9 @@ src/
     └── progress.ts     # Progress tracking
 
 tests/
-├── fixtures/           # Test EPUB generator
-├── parsers/            # EPUB parser tests
+├── fixtures/           # Test file generators (EPUB, MOBI, FB2, CBZ, zip)
+├── loaders/            # Zip loader tests (malformed zip recovery)
+├── parsers/            # Parser tests (EPUB, MOBI, FB2, CBZ)
 └── utils/              # Progress utility tests
 ```
 
@@ -344,10 +377,11 @@ tests/
 | Browser coupling | Parser uses DOM APIs | Parser is env-agnostic (adapters) |
 | Entry point | Custom element | Function API |
 | Framework support | None | Planned React/Vue |
-| Format support | EPUB, MOBI, FB2, CBZ, PDF | EPUB (others planned) |
+| Format support | EPUB, MOBI, FB2, CBZ, PDF | EPUB, MOBI/AZW3, FB2, CBZ |
 | Module system | ESM | ESM + typed exports |
 | Build | None (raw ESM) | Vite + TypeScript |
-| Testing | None | Vitest (45 tests) |
+| Testing | None | Vitest (140 tests) |
+| Malformed EPUB recovery | None (zip.js only) | CD correction + per-entry LFH scan |
 
 ## License
 

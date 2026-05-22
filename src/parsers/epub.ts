@@ -253,16 +253,6 @@ const parseMetadata = (opf: XMLDocument): {
         }
     }
 
-    // Group refines
-    const refinesMap = new Map<string | null, ParsedMeta[]>()
-    for (const meta of metaElements) {
-        // We need to re-check the actual element for refines
-        // Simplified: group by null (top-level properties)
-        const key = null // We'll handle this simpler
-        if (!refinesMap.has(key)) refinesMap.set(key, [])
-        refinesMap.get(key)!.push(meta)
-    }
-
     // Helper functions
     const dc = (name: string): ParsedMeta[] =>
         (dcElements[name] ?? []).map(el => ({

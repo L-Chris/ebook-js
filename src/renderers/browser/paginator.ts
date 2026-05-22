@@ -5,9 +5,26 @@
  * CSS multi-column layout in iframes.
  */
 
-import type { Section, ResolvedNavigation } from '../../core/types'
+import type { Book, Section, ResolvedNavigation } from '../../core/types'
 import type { Renderer, RendererConfig, RendererStyles, LayoutMode } from '../../core/renderer'
-import type { LoadEvent, RelocateEvent } from '../../core/types'
+import type { LoadEvent, RelocateEvent, LinkEvent } from '../../core/types'
+import { SectionProgress } from '../../utils/progress'
+
+// ============================================================================
+// Constants
+// ============================================================================
+
+/** Delay to let CSS column layout settle before scrolling to anchor */
+const LAYOUT_SETTLE_MS = 50
+
+/** Delay to emit relocate event after animated page turn */
+const ANIMATION_SETTLE_MS = 300
+
+/** Debounce interval for container resize */
+const RESIZE_DEBOUNCE_MS = 200
+
+/** Debounce interval for DOM mutation observations */
+const MUTATION_DEBOUNCE_MS = 100
 
 // ============================================================================
 // Utilities
@@ -92,6 +109,7 @@ const getVisibleRange = (
 interface ViewOptions {
     container: HTMLElement
     onLink: (href: string) => void
+    onResize?: () => void
 }
 
 class View {
@@ -100,7 +118,6 @@ class View {
     index = -1
     columnCount = 1
     contentWidth = 0
-    private resizeObserver: ResizeObserver
     private mutationObserver: MutationObserver | null = null
 
     constructor(private options: ViewOptions) {
@@ -113,11 +130,6 @@ class View {
             overflow: hidden;
         `
         this.options.container.appendChild(this.iframe)
-
-        this.resizeObserver = new ResizeObserver(debounce(() => {
-            this.onResize()
-        }, 100))
-        this.resizeObserver.observe(this.options.container)
     }
 
     async load(src: string, index: number): Promise<void> {
@@ -149,20 +161,17 @@ class View {
             if (href) this.options.onLink(href)
         })
 
-        // Observe DOM mutations for layout changes
+        // Observe DOM mutations for layout changes — delegate to parent
         this.mutationObserver?.disconnect()
-        this.mutationObserver = new MutationObserver(debounce(() => {
-            this.onResize()
-        }, 100))
-        this.mutationObserver.observe(this.doc.body, {
-            childList: true,
-            subtree: true,
-            characterData: true,
-        })
-    }
-
-    private onResize(): void {
-        // Will be called by paginator to re-layout
+        if (this.options.onResize) {
+            const handler = debounce(this.options.onResize, MUTATION_DEBOUNCE_MS)
+            this.mutationObserver = new MutationObserver(() => handler())
+            this.mutationObserver.observe(this.doc.body, {
+                childList: true,
+                subtree: true,
+                characterData: true,
+            })
+        }
     }
 
     applyStyles(styles: RendererStyles): void {
@@ -234,7 +243,6 @@ class View {
         }
 
         if (typeof target === 'number') {
-            // Fractional scroll position
             this.iframe.contentWindow?.scrollTo(0, target)
         } else if (target instanceof Element) {
             target.scrollIntoView({ block: 'start' })
@@ -251,7 +259,6 @@ class View {
     }
 
     destroy(): void {
-        this.resizeObserver.disconnect()
         this.mutationObserver?.disconnect()
         this.iframe.remove()
     }
@@ -261,10 +268,10 @@ class View {
 // Browser Renderer
 // ============================================================================
 
-type EventMap = {
+interface RendererEventMap {
     load: LoadEvent
     relocate: RelocateEvent
-    link: { href: string; external: boolean }
+    link: LinkEvent
 }
 
 type Listener<T> = (event: T) => void
@@ -273,8 +280,8 @@ export class BrowserRenderer implements Renderer {
     private container: HTMLElement
     private wrapper: HTMLElement
     private view: View | null = null
+    private book: Book | null = null
     private sections: Section[] = []
-    private bookDir: string | undefined
     private currentIndex = -1
     private currentFraction = 0
     private pageWidth = 0
@@ -283,7 +290,7 @@ export class BrowserRenderer implements Renderer {
     private styles: RendererStyles
     private animated: boolean
     private listeners = new Map<string, Set<Listener<unknown>>>()
-    private sectionFractions: number[] = []
+    private progress: SectionProgress | null = null
     private lastLocation: RelocateEvent | null = null
     private resizeObserver: ResizeObserver
     private isNavigating = false
@@ -307,23 +314,16 @@ export class BrowserRenderer implements Renderer {
         // Handle container resize
         this.resizeObserver = new ResizeObserver(debounce(() => {
             this.onResize()
-        }, 200))
+        }, RESIZE_DEBOUNCE_MS))
         this.resizeObserver.observe(this.container)
     }
 
-    async open(book: { sections: Section[]; dir?: string; rendition?: { layout?: string } }): Promise<void> {
+    async open(book: Book): Promise<void> {
+        this.book = book
         this.sections = book.sections
-        this.bookDir = book.dir
 
-        // Calculate section fractions for progress
-        const sizes = this.sections.map(s => s.size || 0)
-        const total = sizes.reduce((a, b) => a + b, 0)
-        let sum = 0
-        this.sectionFractions = [0]
-        for (const size of sizes) {
-            sum += size
-            this.sectionFractions.push(total > 0 ? sum / total : 0)
-        }
+        // Use SectionProgress for consistent progress calculation
+        this.progress = new SectionProgress(this.sections)
 
         // Check if this is a fixed-layout book
         if (book.rendition?.layout === 'pre-paginated') {
@@ -356,10 +356,11 @@ export class BrowserRenderer implements Renderer {
                 this.view.destroy()
             }
 
-            // Create new view
+            // Create new view — delegate resize notifications to paginator
             this.view = new View({
                 container: this.wrapper,
                 onLink: (href) => this.handleLink(href),
+                onResize: () => this.onResize(),
             })
 
             // Load section content
@@ -381,8 +382,7 @@ export class BrowserRenderer implements Renderer {
 
             // Scroll to anchor if provided
             if (anchor !== undefined) {
-                // Small delay to let layout settle
-                await new Promise(r => setTimeout(r, 50))
+                await new Promise(r => setTimeout(r, LAYOUT_SETTLE_MS))
                 this.view.scrollToAnchor(anchor)
             }
 
@@ -422,22 +422,30 @@ export class BrowserRenderer implements Renderer {
     }
 
     private getTotalFraction(): number {
-        if (!this.sections.length) return 0
-        const sectionFraction = this.sectionFractions[this.currentIndex] ?? 0
-        const nextSectionFraction = this.sectionFractions[this.currentIndex + 1] ?? 1
-        const sectionSize = nextSectionFraction - sectionFraction
-        return sectionFraction + this.currentFraction * sectionSize
+        if (!this.progress) return 0
+        return this.progress.getProgress(this.currentIndex, this.currentFraction).fraction
     }
 
+    /**
+     * Resolve a link href using the Book's resolveHref/isExternal methods
+     * when available, falling back to a basic implementation.
+     */
     private handleLink(href: string): void {
-        const isExt = /^(?!blob)\w+:/i.test(href)
+        // Delegate external check to Book if available
+        const isExt = this.book?.isExternal
+            ? this.book.isExternal(href)
+            : /^(?!blob)\w+:/i.test(href)
+
         if (isExt) {
             this.emit('link', { href, external: true })
             return
         }
 
-        // Try to resolve as internal link
-        const resolved = this.resolveHref(href)
+        // Delegate resolution to Book if available
+        const resolved = this.book?.resolveHref
+            ? this.book.resolveHref(href)
+            : this.resolveHrefFallback(href)
+
         if (resolved) {
             this.emit('link', { href, external: false })
             this.loadSection(resolved.index, resolved.anchor)
@@ -446,8 +454,10 @@ export class BrowserRenderer implements Renderer {
         }
     }
 
-    private resolveHref(href: string): ResolvedNavigation | null {
-        // Try to find section by matching href
+    /**
+     * Fallback href resolution when Book.resolveHref is not available.
+     */
+    private resolveHrefFallback(href: string): ResolvedNavigation | null {
         const [path, hash] = href.split('#')
         const index = this.sections.findIndex(s => {
             if (typeof s.id === 'string') {
@@ -476,7 +486,8 @@ export class BrowserRenderer implements Renderer {
         if (typeof target === 'number') {
             await this.loadSection(target)
         } else {
-            const resolved = this.resolveHref(target)
+            const resolved = this.book?.resolveHref?.(target)
+                ?? this.resolveHrefFallback(target)
             if (resolved) {
                 await this.loadSection(resolved.index, resolved.anchor)
             }
@@ -491,21 +502,18 @@ export class BrowserRenderer implements Renderer {
             const maxScroll = this.view.contentWidth - this.pageWidth
 
             if (scrollLeft < maxScroll - 1) {
-                // Scroll to next page within section
                 const newScroll = Math.min(maxScroll, scrollLeft + this.pageWidth)
                 this.view.iframe.contentWindow?.scrollTo({
                     left: newScroll,
                     behavior: this.animated ? 'smooth' : 'instant',
                 })
-                setTimeout(() => this.emitRelocate('page'), 300)
+                setTimeout(() => this.emitRelocate('page'), ANIMATION_SETTLE_MS)
             } else {
-                // Go to next section
                 if (this.currentIndex < this.sections.length - 1) {
                     await this.loadSection(this.currentIndex + 1)
                 }
             }
         } else {
-            // Scrolled mode: scroll down one page
             const win = this.view.iframe.contentWindow
             if (!win) return
             const { height } = this.getPageSize()
@@ -513,7 +521,7 @@ export class BrowserRenderer implements Renderer {
 
             if (win.scrollY < maxScroll - 1) {
                 win.scrollBy({ top: height, behavior: this.animated ? 'smooth' : 'instant' })
-                setTimeout(() => this.emitRelocate('scroll'), 300)
+                setTimeout(() => this.emitRelocate('scroll'), ANIMATION_SETTLE_MS)
             } else if (this.currentIndex < this.sections.length - 1) {
                 await this.loadSection(this.currentIndex + 1)
             }
@@ -527,19 +535,16 @@ export class BrowserRenderer implements Renderer {
             const scrollLeft = this.view.iframe.contentWindow?.scrollX ?? 0
 
             if (scrollLeft > 1) {
-                // Scroll to previous page within section
                 const newScroll = Math.max(0, scrollLeft - this.pageWidth)
                 this.view.iframe.contentWindow?.scrollTo({
                     left: newScroll,
                     behavior: this.animated ? 'smooth' : 'instant',
                 })
-                setTimeout(() => this.emitRelocate('page'), 300)
+                setTimeout(() => this.emitRelocate('page'), ANIMATION_SETTLE_MS)
             } else {
-                // Go to previous section
                 if (this.currentIndex > 0) {
                     await this.loadSection(this.currentIndex - 1, (_doc: Document) => {
-                        // Scroll to end of section
-                        return null // Will be handled after load
+                        return null // Will scroll to end after load
                     })
                     // Scroll to end after loading
                     if (this.view) {
@@ -555,7 +560,7 @@ export class BrowserRenderer implements Renderer {
 
             if (win.scrollY > 1) {
                 win.scrollBy({ top: -height, behavior: this.animated ? 'smooth' : 'instant' })
-                setTimeout(() => this.emitRelocate('scroll'), 300)
+                setTimeout(() => this.emitRelocate('scroll'), ANIMATION_SETTLE_MS)
             } else if (this.currentIndex > 0) {
                 await this.loadSection(this.currentIndex - 1)
             }
@@ -565,23 +570,15 @@ export class BrowserRenderer implements Renderer {
     async goToFraction(fraction: number): Promise<void> {
         fraction = Math.max(0, Math.min(1, fraction))
 
-        // Find the section
-        let index = this.sectionFractions.findIndex(f => f > fraction) - 1
-        if (index < 0) index = 0
-        if (index >= this.sections.length) index = this.sections.length - 1
+        if (!this.progress) return
 
-        const sectionStart = this.sectionFractions[index]
-        const sectionEnd = this.sectionFractions[index + 1] ?? 1
-        const sectionFraction = sectionEnd > sectionStart
-            ? (fraction - sectionStart) / (sectionEnd - sectionStart)
-            : 0
-
+        const [index, fractionInSection] = this.progress.getSection(fraction)
         await this.loadSection(index)
 
         // Scroll to fraction within section
         if (this.view && this.layout === 'paginated') {
             const maxScroll = this.view.contentWidth - this.pageWidth
-            this.view.iframe.contentWindow?.scrollTo(maxScroll * sectionFraction, 0)
+            this.view.iframe.contentWindow?.scrollTo(maxScroll * fractionInSection, 0)
             this.emitRelocate('fraction')
         }
     }
@@ -619,9 +616,11 @@ export class BrowserRenderer implements Renderer {
     }
 
     getSectionFractions(): number[] {
-        return this.sectionFractions
+        return this.progress?.getFractions() ?? []
     }
 
+    on<K extends keyof RendererEventMap>(event: K, listener: Listener<RendererEventMap[K]>): void
+    on(event: string, listener: Listener<unknown>): void
     on(event: string, listener: Listener<unknown>): void {
         if (!this.listeners.has(event)) {
             this.listeners.set(event, new Set())
@@ -629,11 +628,13 @@ export class BrowserRenderer implements Renderer {
         this.listeners.get(event)!.add(listener)
     }
 
+    off<K extends keyof RendererEventMap>(event: K, listener: Listener<RendererEventMap[K]>): void
+    off(event: string, listener: Listener<unknown>): void
     off(event: string, listener: Listener<unknown>): void {
         this.listeners.get(event)?.delete(listener)
     }
 
-    private emit(event: string, data: unknown): void {
+    private emit<K extends keyof RendererEventMap>(event: K, data: RendererEventMap[K]): void {
         this.listeners.get(event)?.forEach(fn => fn(data))
     }
 
@@ -642,6 +643,7 @@ export class BrowserRenderer implements Renderer {
         this.view?.destroy()
         this.wrapper.remove()
         this.listeners.clear()
+        this.book = null
     }
 }
 

@@ -44,4 +44,10 @@ export interface Loader {
      * @returns Size in bytes, or 0 if not found
      */
     getSize(filename: string): number
+
+    /**
+     * Get the archive comment (zip comment field).
+     * @returns Comment string, or null if not available
+     */
+    getComment?(): Promise<string | null>
 }

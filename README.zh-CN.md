@@ -8,8 +8,8 @@
 
 - **模块化架构**：解析器与渲染器相互独立，可自由组合
 - **TypeScript**：完整的类型安全，提供全面的接口定义
-- **EPUB 支持**：完整支持 EPUB 2.x 和 3.x 解析，包含元数据、目录和导航
-- **环境无关的解析器**：EPUB 解析器通过适配器注入，可在浏览器、Node.js 或 Worker 中运行
+- **多格式支持**：EPUB 2.x/3.x、MOBI/AZW/AZW3、FictionBook 2、CBZ
+- **环境无关的解析器**：所有解析器通过适配器注入，可在浏览器、Node.js 或 Worker 中运行
 - **浏览器渲染器**：支持分页和滚动两种阅读模式
 - **进度追踪**：支持章节级和目录级的进度报告
 - **框架无关**：核心库兼容任意框架；React/Vue 封装计划中
@@ -25,9 +25,15 @@ npm install ebook-js
 ```typescript
 import { registry, createReader } from 'ebook-js'
 import { epub } from 'ebook-js/parsers/epub'
+import { mobi } from 'ebook-js/parsers/mobi'
+import { fb2 } from 'ebook-js/parsers/fb2'
+import { cbz } from 'ebook-js/parsers/cbz'
 
-// 1. 注册解析器
+// 1. 注册解析器（支持自动检测格式）
 registry.register('epub', epub)
+registry.register('mobi', mobi)
+registry.register('fb2', fb2)
+registry.register('cbz', cbz)
 
 // 2. 创建阅读器
 const reader = createReader({
@@ -195,6 +201,17 @@ const urlFactory = new TestURLFactory()
 const book = await registry.open(arrayBuffer, { domAdapter, urlFactory })
 ```
 
+## 畸形 EPUB 处理
+
+许多 EPUB 文件的 zip 归档存在结构性问题——特别是中央目录（Central Directory）偏移量错误，导致标准 zip 库无法读取条目数据。ebook-js 包含多重回退策略来优雅地处理这些文件：
+
+1. **前缀数据校正** — 检测并修正统一偏移的数据（常见于自解压归档或带有前缀数据的文件），在重试前修补中央目录条目。
+2. **逐条目本地文件头扫描** — 当个别条目偏移量错误时，扫描整个文件查找实际的本地文件头（Local File Header）位置，并使用 `DecompressionStream` 直接提取数据。
+3. **纯本地文件头回退** — 当中央目录完全不可读时，仅从本地文件头构建条目列表和加载器。
+4. **优雅降级** — 无法恢复的条目返回 `null` 而非抛出异常，允许书籍的其余部分正常加载。
+
+这使得 ebook-js 在处理各种制作工具生成的 EPUB 文件时，比原生 `@zip.js/zip.js` 或 foliate-js 等库具有更强的容错能力。
+
 ## API 参考
 
 ### 解析器注册表
@@ -317,7 +334,10 @@ src/
 │   ├── browser.ts      # 浏览器 DOM/URL 适配器
 │   └── test.ts         # Node.js 测试适配器
 ├── parsers/
-│   └── epub.ts         # EPUB 解析器（环境无关）
+│   ├── epub.ts         # EPUB 解析器
+│   ├── mobi.ts         # MOBI/AZW/AZW3 解析器
+│   ├── fb2.ts          # FictionBook 2 解析器
+│   └── cbz.ts          # Comic Book Zip 解析器
 ├── loaders/
 │   └── zip-loader.ts   # Zip 归档加载器
 ├── renderers/
@@ -328,8 +348,9 @@ src/
     └── progress.ts     # 进度追踪
 
 tests/
-├── fixtures/           # 测试用 EPUB 生成器
-├── parsers/            # EPUB 解析器测试
+├── fixtures/           # 测试文件生成器（EPUB、MOBI、FB2、CBZ、zip）
+├── loaders/            # Zip 加载器测试（畸形 zip 恢复）
+├── parsers/            # 解析器测试（EPUB、MOBI、FB2、CBZ）
 └── utils/              # 进度工具测试
 ```
 
@@ -342,10 +363,11 @@ tests/
 | 浏览器耦合 | 解析器使用 DOM API | 解析器环境无关（适配器） |
 | 入口方式 | 自定义元素 | 函数式 API |
 | 框架支持 | 无 | 计划支持 React/Vue |
-| 格式支持 | EPUB、MOBI、FB2、CBZ、PDF | EPUB（其他格式计划中） |
+| 格式支持 | EPUB、MOBI、FB2、CBZ、PDF | EPUB、MOBI/AZW3、FB2、CBZ |
 | 模块系统 | ESM | ESM + 类型导出 |
 | 构建工具 | 无（原始 ESM） | Vite + TypeScript |
-| 测试 | 无 | Vitest（45 个测试） |
+| 测试 | 无 | Vitest（140 个测试） |
+| 畸形 EPUB 容错 | 无（仅 zip.js） | CD 校正 + 逐条目 LFH 扫描 |
 
 ## 许可证
 

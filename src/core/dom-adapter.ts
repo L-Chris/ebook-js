@@ -56,6 +56,12 @@ export interface XMLDocument {
   querySelectorAll(selector: string): XMLElement[]
   lookupNamespaceURI(prefix: string | null): string | null
   lookupPrefix(ns: string): string | null
+
+  /**
+   * Return the underlying native document object.
+   * Used by adapters that need to unwrap the document (e.g. for serialization).
+   */
+  toNative?(): unknown
 }
 
 /**
