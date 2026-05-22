@@ -372,6 +372,19 @@ reader.setStyles({ css: fb2DefaultStyles + `
 ` })
 ```
 
+## MOBI6 Styles
+
+Like FB2, legacy MOBI6 content (older Mobipocket files, typically `.mobi`) lacks embedded stylesheets. The parser provides clean content and exports default styles for proper rendering:
+
+```typescript
+import { mobi6DefaultStyles } from 'ebook-js'
+
+// Apply default MOBI6 styles to the renderer
+reader.setStyles({ css: mobi6DefaultStyles })
+```
+
+Modern KF8/AZW3 files (`.azw3`) have embedded styles and don't need this — applying `mobi6DefaultStyles` won't hurt them, as the book's own styles take precedence.
+
 ## Malformed EPUB Handling
 
 Many EPUB files in the wild have structural issues in their zip archives — particularly incorrect Central Directory offsets that prevent standard zip libraries from reading entry data. ebook-js includes multiple fallback strategies to handle these files gracefully:

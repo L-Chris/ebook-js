@@ -367,6 +367,19 @@ reader.setStyles({ css: fb2DefaultStyles + `
 ` })
 ```
 
+## MOBI6 样式
+
+与 FB2 类似，旧版 MOBI6 内容（通常为 `.mobi` 格式的旧 Mobipocket 文件）不包含嵌入式样式表。解析器提供干净的内容并导出默认样式用于正确渲染：
+
+```typescript
+import { mobi6DefaultStyles } from 'ebook-js'
+
+// 将默认 MOBI6 样式应用到渲染器
+reader.setStyles({ css: mobi6DefaultStyles })
+```
+
+现代 KF8/AZW3 文件（`.azw3`）有自己的嵌入式样式，不需要这个——应用 `mobi6DefaultStyles` 不会影响它们，因为书籍自身的样式优先级更高。
+
 ## 畸形 EPUB 处理
 
 许多 EPUB 文件的 zip 归档存在结构性问题——特别是中央目录（Central Directory）偏移量错误，导致标准 zip 库无法读取条目数据。ebook-js 包含多重回退策略来优雅地处理这些文件：

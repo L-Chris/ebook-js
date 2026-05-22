@@ -383,7 +383,7 @@
         import { epub } from '../src/parsers/epub.ts'
         import { cbz } from '../src/parsers/cbz.ts'
         import { fb2, fb2DefaultStyles } from '../src/parsers/fb2.ts'
-        import { mobi } from '../src/parsers/mobi.ts'
+        import { mobi, mobi6DefaultStyles } from '../src/parsers/mobi.ts'
 
         // Create shared adapters for all parsers
         const domAdapter = new BrowserDOMAdapter()
@@ -464,6 +464,12 @@
                 const isFB2 = file.name.toLowerCase().match(/\.(fb2|fbz|fb2\.zip)$/)
                 if (isFB2) {
                     reader.setStyles({ css: fb2DefaultStyles })
+                }
+
+                // Detect MOBI files and apply default styles (MOBI6 needs them; KF8 ignores)
+                const isMOBI = file.name.toLowerCase().match(/\.(mobi|azw|azw3)$/)
+                if (isMOBI) {
+                    reader.setStyles({ css: mobi6DefaultStyles })
                 }
 
                 const book = await reader.open(file)

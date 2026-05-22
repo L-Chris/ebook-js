@@ -102,7 +102,7 @@ export {
 export { epub, EPUBParser } from './parsers/epub'
 export { cbz, CBZParser } from './parsers/cbz'
 export { fb2, FB2Parser, fb2DefaultStyles } from './parsers/fb2'
-export { mobi, MOBIParser } from './parsers/mobi'
+export { mobi, MOBIParser, mobi6DefaultStyles } from './parsers/mobi'
 
 // Loaders
 export { createZipLoader, isZipFile } from './loaders'

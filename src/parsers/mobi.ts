@@ -31,6 +31,21 @@ const MIME_XML = 'application/xml'
 const MIME_CSS = 'text/css'
 const MIME_SVG = 'image/svg+xml'
 
+/**
+ * Default stylesheet for MOBI6 (legacy Mobipocket) content.
+ * MOBI6 content lacks embedded stylesheets, so this provides basic formatting.
+ * Renderers can use this via `renderer.setStyles({ css: mobi6DefaultStyles })`.
+ * Users can also provide their own styles instead.
+ */
+export const mobi6DefaultStyles = `
+blockquote {
+    margin-block-start: 0;
+    margin-block-end: 0;
+    margin-inline-start: 1em;
+    margin-inline-end: 0;
+}
+`
+
 const MOBI_ENCODING: Record<number, string> = {
     1252: 'windows-1252',
     65001: 'utf-8',
@@ -1022,15 +1037,8 @@ class MOBI6 {
         let str = await this.createDocument(section)
         str = await this.replaceResources(str)
 
-        // Wrap in HTML document
-        const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
-blockquote {
-    margin-block-start: 0;
-    margin-block-end: 0;
-    margin-inline-start: 1em;
-    margin-inline-end: 0;
-}
-</style></head><body>${str}</body></html>`
+        // Wrap in minimal HTML document (styles should be applied by the renderer)
+        const html = `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body>${str}</body></html>`
 
         const url = this.#createURL(html, MIME_HTML)
         this.#cache.set(section, url)
