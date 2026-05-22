@@ -27,6 +27,7 @@ export type {
     Book,
     BookMetadata,
     Section,
+    SectionFormat,
     TOCItem,
     Landmark,
     Rendition,

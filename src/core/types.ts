@@ -80,17 +80,37 @@ export interface Landmark {
 // ============================================================================
 
 /**
+ * Content format types for sections.
+ * - 'xhtml': XHTML document or fragment (used by EPUB, FB2, KF8)
+ * - 'html': HTML document or fragment (used by MOBI6)
+ * - 'image': Image data (base64 data URI or URL, used by CBZ)
+ */
+export type SectionFormat = 'xhtml' | 'html' | 'image'
+
+/**
  * A section represents a renderable unit of the book (typically a chapter).
  * The renderer loads sections on demand.
+ *
+ * Section.load() returns content as a string. The renderer is responsible for:
+ * - Wrapping fragments in a full document (if needed)
+ * - Creating blob URLs (for web/iframe rendering)
+ * - Converting to platform-specific formats (e.g., WXML for WeChat Mini Programs)
  */
 export interface Section {
     /** Unique identifier for this section (used as Map key) */
     id: string | number
     /**
-     * Load the section and return a URL that can be rendered.
-     * Typically a blob: URL pointing to the processed content.
+     * Load the section and return content as a string.
+     * - For 'xhtml'/'html' format: returns HTML/XHTML string (may contain blob URLs for embedded resources)
+     * - For 'image' format: returns data URI or base64 string
+     * The renderer decides how to display this content.
      */
     load(): Promise<string> | string
+    /**
+     * Content format. Determines how the renderer should handle the content.
+     * Default: 'xhtml'
+     */
+    format?: SectionFormat
     /**
      * Optional: free resources when the section is unloaded.
      */

@@ -908,6 +908,7 @@ class MOBI6 {
             id: index,
             load: () => this.loadSection(section),
             createDocument: () => this.createDocument(section),
+            format: 'html' as const,
             size: section.end - section.start,
         }))
 
@@ -1038,11 +1039,11 @@ class MOBI6 {
         str = await this.replaceResources(str)
 
         // Wrap in minimal HTML document (styles should be applied by the renderer)
+        // Return the HTML string directly; the renderer creates blob URLs if needed.
         const html = `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body>${str}</body></html>`
 
-        const url = this.#createURL(html, MIME_HTML)
-        this.#cache.set(section, url)
-        return url
+        this.#cache.set(section, html)
+        return html
     }
 
     resolveHref(href: string): { index: number; anchor: (doc: unknown) => unknown } | null {
@@ -1074,7 +1075,10 @@ class MOBI6 {
 
     destroy(): void {
         for (const url of this.#resourceCache.values()) this.#revokeURL(url)
-        for (const url of this.#cache.values()) this.#revokeURL(url)
+        for (const url of this.#cache.values()) {
+            // Section content is now a string, not a blob URL
+            if (url.startsWith('blob:') || url.startsWith('test:')) this.#revokeURL(url)
+        }
     }
 
     #createURL(data: string | ArrayBuffer, mimeType: string): string {
@@ -1295,6 +1299,7 @@ class KF8 {
                 id: index,
                 load: () => this.loadSection(section),
                 createDocument: () => this.createDocument(section),
+                format: 'xhtml' as const,
                 size: section.length,
             }) : ({ id: `nonlinear-${index}`, size: 0, linear: 'no', load: () => '' }))
 
@@ -1453,9 +1458,9 @@ class KF8 {
             docStr = this.#domAdapter.serialize(doc)
         }
 
-        const url = this.#createURL(docStr, this.#type)
-        this.#cache.set(section, url)
-        return url
+        // Return the HTML string directly; the renderer creates blob URLs if needed.
+        this.#cache.set(section, docStr)
+        return docStr
     }
 
     getIndexByFID(fid: number): number {

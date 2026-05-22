@@ -134,15 +134,28 @@ describe('MOBIParser', () => {
             expect(book.sections.length).toBeGreaterThanOrEqual(3)
         })
 
-        it('should load section content as URL', async () => {
+        it('should load section content as string', async () => {
             const buffer = createTestMOBI({
                 sections: [{ html: '<html><body><p>Hello, world!</p></body></html>' }],
             })
             const book = await parser.parse(buffer, options)
 
-            const url = await book.sections[0].load()
-            expect(url).toBeDefined()
-            expect(typeof url).toBe('string')
+            const content = await book.sections[0].load()
+            expect(content).toBeDefined()
+            expect(typeof content).toBe('string')
+            // Section.load() returns HTML string, not a blob URL
+            expect(content).toContain('Hello, world!')
+        })
+
+        it('should set section format to html', async () => {
+            const buffer = createTestMOBI({
+                sections: [{ html: '<html><body><p>Content</p></body></html>' }],
+            })
+            const book = await parser.parse(buffer, options)
+
+            for (const section of book.sections) {
+                expect(section.format).toBe('html')
+            }
         })
 
         it('should create document from section', async () => {

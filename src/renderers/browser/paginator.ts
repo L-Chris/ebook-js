@@ -118,6 +118,7 @@ class View {
     index = -1
     columnCount = 1
     contentWidth = 0
+    private blobURL: string | null = null
     private mutationObserver: MutationObserver | null = null
 
     constructor(private options: ViewOptions) {
@@ -132,8 +133,28 @@ class View {
         this.options.container.appendChild(this.iframe)
     }
 
-    async load(src: string, index: number): Promise<void> {
+    /**
+     * Load section content into the iframe.
+     * The content is a string (HTML, XHTML, or image data URI).
+     * The View creates a blob URL for the iframe and revokes it on destroy.
+     */
+    async load(content: string, index: number, format?: string): Promise<void> {
         this.index = index
+
+        // Revoke previous blob URL
+        if (this.blobURL) {
+            URL.revokeObjectURL(this.blobURL)
+            this.blobURL = null
+        }
+
+        // Build a full HTML document from the content
+        const { html, mimeType } = this.buildDocument(content, format)
+
+        // Create blob URL for the iframe
+        const blob = new Blob([html], { type: mimeType })
+        const url = URL.createObjectURL(blob)
+        this.blobURL = url
+
         return new Promise((resolve, reject) => {
             this.iframe.onload = () => {
                 this.doc = this.iframe.contentDocument
@@ -145,8 +166,43 @@ class View {
                 resolve()
             }
             this.iframe.onerror = () => reject(new Error('Failed to load section'))
-            this.iframe.src = src
+            this.iframe.src = url
         })
+    }
+
+    /**
+     * Wrap section content in a full HTML document if needed.
+     * Returns the document string and appropriate MIME type.
+     */
+    private buildDocument(content: string, format?: string): { html: string; mimeType: string } {
+        // Already a full document — use as-is
+        const isFullDocument = /^\s*(<!DOCTYPE|<html[\s>])/i.test(content)
+        if (isFullDocument) {
+            const mimeType = format === 'xhtml' ? 'application/xhtml+xml' : 'text/html'
+            return { html: content, mimeType }
+        }
+
+        // Image content — wrap in HTML with <img>
+        if (format === 'image') {
+            return {
+                html: `<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{margin:0;display:flex;justify-content:center;align-items:center;min-height:100vh}img{max-width:100%;max-height:100vh;object-fit:contain}</style></head><body><img src="${content}"></body></html>`,
+                mimeType: 'text/html',
+            }
+        }
+
+        // HTML or XHTML fragment — wrap in document
+        if (format === 'xhtml') {
+            return {
+                html: `<?xml version="1.0" encoding="utf-8"?><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="utf-8"/></head><body>${content}</body></html>`,
+                mimeType: 'application/xhtml+xml',
+            }
+        }
+
+        // Default: HTML fragment
+        return {
+            html: `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body>${content}</body></html>`,
+            mimeType: 'text/html',
+        }
     }
 
     private setupDocument(): void {
@@ -260,6 +316,10 @@ class View {
 
     destroy(): void {
         this.mutationObserver?.disconnect()
+        if (this.blobURL) {
+            URL.revokeObjectURL(this.blobURL)
+            this.blobURL = null
+        }
         this.iframe.remove()
     }
 }
@@ -364,8 +424,9 @@ export class BrowserRenderer implements Renderer {
             })
 
             // Load section content
-            const src = await this.sections[index].load()
-            await this.view.load(src, index)
+            const content = await this.sections[index].load()
+            const format = this.sections[index].format
+            await this.view.load(content, index, format)
 
             // Apply styles
             this.view.applyStyles(this.styles)

@@ -101,8 +101,31 @@ try {
 ### 设计原则
 
 1. **解析器环境无关**：EPUB 解析器不依赖浏览器 API。DOM 解析和 URL 创建通过适配器注入。
-2. **渲染器管理浏览器**：浏览器相关逻辑（iframe、CSS 分栏、DOM 事件）统一由渲染器处理。
+2. **渲染器管理平台**：平台相关逻辑（iframe、CSS 分栏、DOM 事件、WXML、WebView）统一由渲染器处理。
 3. **Book 是契约**：解析器产出 `Book`，渲染器消费 `Book`，双方互不感知。
+4. **内容字符串而非 URL**：`Section.load()` 返回内容字符串而非 blob URL，渲染器决定如何展示（Web 用 blob URL、微信用 WXML 等）。
+
+### 跨平台渲染
+
+`Section.load()` 方法返回**内容字符串**而非平台特定的 URL。这使得同一解析器输出可被不同渲染器消费：
+
+| 平台 | 渲染器 | 展示方式 |
+|------|--------|----------|
+| Web 浏览器 | `BrowserRenderer` | 包装为 HTML 文档 → blob URL → iframe |
+| 微信小程序 | （计划中） | 转换为 WXML → `<rich-text>` 组件 |
+| React Native | （计划中） | 注入 WebView 或原生视图 |
+| Node.js / SSR | （自定义） | 提取文本、生成静态 HTML |
+
+要构建自定义渲染器，消费 `book.sections[i].load()` 并根据 `section.format` 处理内容：
+
+```typescript
+const content = await section.load()
+switch (section.format) {
+    case 'xhtml': // 有效的 XHTML — 使用 XML 解析器渲染
+    case 'html':  // HTML — 使用 HTML 解析器渲染
+    case 'image': // Data URI — 使用图片组件渲染
+}
+```
 
 ### 核心接口
 
@@ -121,14 +144,23 @@ interface Book {
 
 #### `Section`（单个章节/文档）
 ```typescript
+type SectionFormat = 'xhtml' | 'html' | 'image'
+
 interface Section {
     id: string | number
-    load(): Promise<string>              // 返回内容的 URL（通过 URLFactory）
-    unload?(): void                      // 释放资源
-    createDocument?(): Promise<string>   // 返回原始 HTML 字符串（用于搜索）
-    size: number                         // 字节大小（用于进度计算）
+    load(): Promise<string> | string       // 返回内容字符串（非 URL）
+    format?: SectionFormat                 // 内容类型（默认 'xhtml'）
+    unload?(): void                        // 释放资源
+    createDocument?(): Promise<string>     // 返回原始 HTML 字符串（用于搜索）
+    size: number                           // 字节大小（用于进度计算）
 }
 ```
+
+`load()` 返回**内容字符串** —— 渲染器决定如何展示：
+- `'xhtml'`/`'html'`：完整的 HTML/XHTML 文档或片段。浏览器渲染器负责包装片段并创建 blob URL 用于 iframe 展示。
+- `'image'`：Data URI 或 base64 字符串。渲染器将其包装在 `<img>` 标签中。
+
+这种设计实现了**跨平台渲染**：同一解析器输出可用于 Web 浏览器（iframe + blob URL）、微信小程序（`<rich-text>` / WXML）、React Native（WebView）等多种平台。
 
 #### `Parser`（解析器）
 ```typescript

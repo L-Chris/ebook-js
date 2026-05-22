@@ -361,9 +361,8 @@ export class FB2Parser implements Parser {
 
     async parse(input: ParserInput, options?: ParserOptions): Promise<Book> {
         const domAdapter = options?.domAdapter
-        const urlFactory = options?.urlFactory
-        if (!domAdapter || !urlFactory) {
-            throw new AdapterRequiredError('domAdapter and urlFactory')
+        if (!domAdapter) {
+            throw new AdapterRequiredError('domAdapter')
         }
 
         if (typeof input === 'string') {
@@ -372,7 +371,6 @@ export class FB2Parser implements Parser {
 
         // Load FB2 XML content
         let xmlContent: string
-        const urls: string[] = []
 
         if (await isZipFile(input)) {
             // Zipped FB2 — find and load the .fb2 file
@@ -546,16 +544,15 @@ export class FB2Parser implements Parser {
                         }
                     }
 
-                    // Create section HTML
+                    // Create section HTML — return string directly, renderer creates URLs
                     const sectionHtml = buildXHTMLDocument(child, bodyType)
                     const sectionBlob = new Blob([sectionHtml], { type: MIME_XHTML })
-                    const sectionUrl = urlFactory.createURL(sectionHtml, MIME_XHTML)
-                    urls.push(sectionUrl)
 
                     sections.push({
                         id: idx,
                         size: sectionBlob.size,
-                        load: () => sectionUrl,
+                        load: () => sectionHtml,
+                        format: 'xhtml' as const,
                         createDocument: () => sectionHtml,
                         linear: bodyType === 'notes' ? 'no' : undefined,
                     })
@@ -573,8 +570,6 @@ export class FB2Parser implements Parser {
 
                 const sectionHtml = buildXHTMLDocument(bodyEl, bodyType || 'notes')
                 const sectionBlob = new Blob([sectionHtml], { type: MIME_XHTML })
-                const sectionUrl = urlFactory.createURL(sectionHtml, MIME_XHTML)
-                urls.push(sectionUrl)
 
                 // Collect IDs
                 for (const el of findAllByTag(bodyEl, '*')) {
@@ -585,7 +580,8 @@ export class FB2Parser implements Parser {
                 sections.push({
                     id: idx,
                     size: sectionBlob.size,
-                    load: () => sectionUrl,
+                    load: () => sectionHtml,
+                    format: 'xhtml' as const,
                     createDocument: () => sectionHtml,
                     linear: 'no',
                 })
@@ -630,9 +626,7 @@ export class FB2Parser implements Parser {
                 return [parts[0] || '', parts[1] || null]
             },
             destroy: () => {
-                for (const url of urls) {
-                    urlFactory.revokeURL(url)
-                }
+                // No blob URLs to revoke — sections return content strings
             },
         }
 

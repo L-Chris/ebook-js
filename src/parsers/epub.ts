@@ -540,7 +540,12 @@ class ResourceLoader {
             }
 
             const result = this.domAdapter.serialize(doc)
-            return this.createURL(href, result, mediaType)
+            // Return the serialized HTML string directly.
+            // The renderer is responsible for creating blob URLs for the document.
+            // Embedded resources (CSS, images) already have blob URLs from loadHref.
+            this.cache.set(href, result)
+            this.refCount.set(href, 1)
+            return result
         }
 
         // CSS
@@ -587,7 +592,8 @@ class ResourceLoader {
         const count = (this.refCount.get(href) ?? 0) - 1
         if (count <= 0) {
             const url = this.cache.get(href)
-            if (url) this.urlFactory.revokeURL(url)
+            // Only revoke blob URLs (CSS, images). HTML content is a string.
+            if (url && url.startsWith('blob:')) this.urlFactory.revokeURL(url)
             this.cache.delete(href)
             this.refCount.delete(href)
         } else {
@@ -596,7 +602,9 @@ class ResourceLoader {
     }
 
     destroy(): void {
-        for (const url of this.cache.values()) this.urlFactory.revokeURL(url)
+        for (const url of this.cache.values()) {
+            if (url.startsWith('blob:')) this.urlFactory.revokeURL(url)
+        }
         this.cache.clear()
         this.refCount.clear()
     }
@@ -754,6 +762,7 @@ class EPUBBook implements Book {
                 id: item.href,
                 load: () => this.resourceLoader.loadItem(item),
                 unload: () => this.resourceLoader.unref(item.href),
+                format: 'xhtml' as const,
                 loadText: () => this.loader.loadText(item.href).then(t => t ?? ''),
                 createDocument: () => this.loadDocument(item),
                 size: this.loader.getSize(item.href),

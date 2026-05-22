@@ -137,11 +137,21 @@ describe('EPUBParser', () => {
             const book = await parser.parse(epubBuffer, { domAdapter, urlFactory })
 
             const section = book.sections[0]
-            const url = await section.load()
+            const content = await section.load()
 
-            expect(url).toBeDefined()
-            expect(typeof url).toBe('string')
-            expect(urlFactory.hasURL(url)).toBe(true)
+            expect(content).toBeDefined()
+            expect(typeof content).toBe('string')
+            // Section.load() returns HTML string, not a blob URL
+            expect(content).toContain('Test content')
+        })
+
+        it('should set section format to xhtml', async () => {
+            const epubBuffer = await createTestEPUB()
+            const book = await parser.parse(epubBuffer, { domAdapter, urlFactory })
+
+            for (const section of book.sections) {
+                expect(section.format).toBe('xhtml')
+            }
         })
 
         it('should provide section sizes', async () => {

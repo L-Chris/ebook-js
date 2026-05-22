@@ -203,15 +203,28 @@ describe('FB2Parser', () => {
             expect(nonLinear.length).toBeGreaterThanOrEqual(1)
         })
 
-        it('should load section content as URL', async () => {
+        it('should load section content as string', async () => {
             const buffer = createTestFB2Buffer({
                 sections: [{ title: 'Chapter', paragraphs: ['Hello'] }],
             })
             const book = await parser.parse(buffer, options)
 
-            const url = await book.sections[0].load()
-            expect(url).toBeDefined()
-            expect(typeof url).toBe('string')
+            const content = await book.sections[0].load()
+            expect(content).toBeDefined()
+            expect(typeof content).toBe('string')
+            // Section.load() returns XHTML string, not a blob URL
+            expect(content).toContain('Hello')
+        })
+
+        it('should set section format to xhtml', async () => {
+            const buffer = createTestFB2Buffer({
+                sections: [{ title: 'Chapter', paragraphs: ['Content'] }],
+            })
+            const book = await parser.parse(buffer, options)
+
+            for (const section of book.sections) {
+                expect(section.format).toBe('xhtml')
+            }
         })
 
         it('should create document from section', async () => {
@@ -301,10 +314,11 @@ describe('FB2Parser', () => {
                 .rejects.toThrow('domAdapter')
         })
 
-        it('should throw without urlFactory', async () => {
+        it('should work without urlFactory (FB2 uses data URIs)', async () => {
             const buffer = createTestFB2Buffer()
-            await expect(parser.parse(buffer, { domAdapter: new TestDOMAdapter() }))
-                .rejects.toThrow('urlFactory')
+            // FB2 no longer requires urlFactory — sections return content strings
+            const book = await parser.parse(buffer, { domAdapter: new TestDOMAdapter() })
+            expect(book.sections.length).toBeGreaterThan(0)
         })
     })
 

@@ -9,7 +9,6 @@
 import type { Book, BookMetadata, Section, TOCItem } from '../core/types'
 import type { Parser, ParserInput, ParserOptions } from '../core/parser'
 import type { Loader } from '../core/loader'
-import type { URLFactory } from '../core/url-factory'
 import type { DOMAdapter } from '../core/dom-adapter'
 import { createZipLoader, isZipFile } from '../loaders/zip-loader'
 import { UnsupportedInputError, ParseError, AdapterRequiredError } from '../core/errors'
@@ -178,13 +177,12 @@ export class CBZParser implements Parser {
             throw new UnsupportedInputError('CBZ parser cannot parse URL strings; provide a File, Blob, or ArrayBuffer')
         }
 
-        // Require adapters
-        if (!options?.domAdapter || !options?.urlFactory) {
-            throw new AdapterRequiredError('domAdapter and urlFactory')
+        // Require adapters — domAdapter for ComicInfo.xml, urlFactory no longer needed
+        if (!options?.domAdapter) {
+            throw new AdapterRequiredError('domAdapter')
         }
 
         const domAdapter = options.domAdapter
-        const urlFactory = options.urlFactory
 
         // Load zip archive
         const loader = await createZipLoader(input)
@@ -222,29 +220,35 @@ export class CBZParser implements Parser {
             }
         }
 
-        // URL cache for lazy loading
-        const urlCache = new Map<string, string>()
+        // Data URI cache for lazy loading
+        const dataCache = new Map<string, string>()
+
+        // Helper to convert Blob to data URI
+        const blobToDataURI = async (blob: Blob, mimeType: string): Promise<string> => {
+            const buffer = await blob.arrayBuffer()
+            const bytes = new Uint8Array(buffer)
+            let binary = ''
+            for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i])
+            return `data:${mimeType};base64,${btoa(binary)}`
+        }
 
         // Build sections
         const sections: Section[] = imageFiles.map(filename => ({
             id: filename,
             size: loader.getSize(filename),
+            format: 'image' as const,
             load: async () => {
-                if (urlCache.has(filename)) {
-                    return urlCache.get(filename)!
+                if (dataCache.has(filename)) {
+                    return dataCache.get(filename)!
                 }
                 const blob = await loader.loadBlob(filename)
                 if (!blob) throw new ParseError(`Failed to load ${filename}`, 'cbz')
-                const url = urlFactory.createURL(blob, getMimeType(filename))
-                urlCache.set(filename, url)
-                return url
+                const dataURI = await blobToDataURI(blob, getMimeType(filename))
+                dataCache.set(filename, dataURI)
+                return dataURI
             },
             unload: () => {
-                const url = urlCache.get(filename)
-                if (url) {
-                    urlFactory.revokeURL(url)
-                    urlCache.delete(filename)
-                }
+                dataCache.delete(filename)
             },
         }))
 
@@ -269,10 +273,7 @@ export class CBZParser implements Parser {
                 return index >= 0 ? { index } : null
             },
             destroy: () => {
-                for (const url of urlCache.values()) {
-                    urlFactory.revokeURL(url)
-                }
-                urlCache.clear()
+                dataCache.clear()
             },
         }
 

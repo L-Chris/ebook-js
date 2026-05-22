@@ -106,8 +106,31 @@ try {
 ### Design Principles
 
 1. **Parsers are environment-agnostic**: Parsers have no browser dependencies. DOM parsing and URL creation are injected via adapters.
-2. **Renderers own the browser**: Browser-specific concerns (iframe, CSS columns, DOM events) live in renderers.
+2. **Renderers own the platform**: Platform-specific concerns (iframe, CSS columns, DOM events, WXML, WebView) live in renderers.
 3. **Book is the contract**: Parsers produce a `Book`, renderers consume it. Neither knows about the other.
+4. **Content strings, not URLs**: `Section.load()` returns content strings, not blob URLs. The renderer decides how to display them (blob URL for web, WXML for WeChat, etc.).
+
+### Cross-Platform Rendering
+
+The `Section.load()` method returns **content strings** rather than platform-specific URLs. This allows the same parser output to be consumed by different renderers:
+
+| Platform | Renderer | How content is displayed |
+|----------|----------|--------------------------|
+| Web browser | `BrowserRenderer` | Wraps in HTML document → blob URL → iframe |
+| WeChat Mini Program | (planned) | Converts to WXML → `<rich-text>` component |
+| React Native | (planned) | Injects into WebView or native view |
+| Node.js / SSR | (custom) | Extracts text, generates static HTML |
+
+To build a custom renderer, consume `book.sections[i].load()` and handle the content based on `section.format`:
+
+```typescript
+const content = await section.load()
+switch (section.format) {
+    case 'xhtml': // Valid XHTML — render with XML parser
+    case 'html':  // HTML — render with HTML parser
+    case 'image': // Data URI — render with image component
+}
+```
 
 ### Key Interfaces
 
@@ -126,14 +149,23 @@ interface Book {
 
 #### `Section` (a single chapter/document)
 ```typescript
+type SectionFormat = 'xhtml' | 'html' | 'image'
+
 interface Section {
     id: string | number
-    load(): Promise<string>              // Returns URL for content (via URLFactory)
-    unload?(): void                      // Free resources
-    createDocument?(): Promise<string>   // Returns raw HTML string for searching
-    size: number                         // Byte size for progress
+    load(): Promise<string> | string       // Returns content string (not a URL)
+    format?: SectionFormat                 // Content type (default: 'xhtml')
+    unload?(): void                        // Free resources
+    createDocument?(): Promise<string>     // Returns raw HTML string for searching
+    size: number                           // Byte size for progress
 }
 ```
+
+`load()` returns a **content string** — the renderer decides how to display it:
+- `'xhtml'`/`'html'`: Full HTML/XHTML document or fragment. The browser renderer wraps fragments and creates blob URLs for iframe display.
+- `'image'`: Data URI or base64 string. The renderer wraps it in an `<img>` tag.
+
+This design enables **cross-platform rendering**: the same parser output works with web browsers (iframe + blob URLs), WeChat Mini Programs (`<rich-text>` / WXML), React Native (WebView), and more.
 
 #### `Parser`
 ```typescript
