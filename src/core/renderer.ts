@@ -33,6 +33,8 @@ export interface RendererStyles {
     gap?: string
     /** Maximum column width (for paginated mode) */
     maxInlineSize?: string
+    /** Minimum column width — switch to single column below this (virtual-text renderer) */
+    minColumnWidth?: string
     /** Maximum page height (for paginated mode) */
     maxBlockSize?: string
     /** Header/footer margin */

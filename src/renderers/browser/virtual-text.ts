@@ -325,13 +325,12 @@ export class VirtualTextRenderer implements Renderer {
         if (!this.prepared) return
         const margin = parseCSSPixels(this.styles.margin, DEFAULT_MARGIN)
         const gap = parseCSSPixels(this.styles.gap, DEFAULT_GAP)
-        const maxInlineSize = parseCSSPixels(this.styles.maxInlineSize, 720)
+        const minColumnWidth = parseCSSPixels(this.styles.minColumnWidth, 320)
         const availableWidth = Math.max(1, this.scroller.clientWidth - margin * 2)
-        const columns = this.getColumnCount(availableWidth, maxInlineSize, gap)
-        const inlineSize = Math.max(1, Math.min(
-            maxInlineSize,
-            (availableWidth - gap * (columns - 1)) / columns,
-        ))
+        const columns = this.getColumnCount(availableWidth, minColumnWidth, gap)
+        const inlineSize = columns > 1
+            ? Math.max(minColumnWidth, (availableWidth - gap * (columns - 1)) / columns)
+            : availableWidth
         this.lines = layoutText(this.prepared, {
             inlineSize,
             lineHeight: this.getLineHeightPixels(),
@@ -448,8 +447,8 @@ export class VirtualTextRenderer implements Renderer {
         }
     }
 
-    private getColumnCount(availableWidth: number, maxInlineSize: number, gap: number): number {
-        return getColumnCount(this.layoutMode, availableWidth, maxInlineSize, gap, this.maxColumnCount)
+    private getColumnCount(availableWidth: number, minColumnWidth: number, gap: number): number {
+        return getColumnCount(this.layoutMode, availableWidth, minColumnWidth, gap, this.maxColumnCount)
     }
 
     private getRenderedLinePosition(line: LineRange): { top: number; left: number } {
@@ -582,12 +581,12 @@ function getLineHeightMultiplier(value: RendererStyles['lineHeight'], fontSize: 
 function getColumnCount(
     mode: LayoutMode,
     availableWidth: number,
-    maxInlineSize: number,
+    minColumnWidth: number,
     gap: number,
     maxColumnCount: number,
 ): number {
     if (mode !== 'paginated' || maxColumnCount < 2) return 1
-    return availableWidth >= maxInlineSize * 2 + gap ? 2 : 1
+    return availableWidth >= minColumnWidth * 2 + gap ? 2 : 1
 }
 
 function getPagePaddingBlock(mode: LayoutMode, pageHeight: number, margin: number): number {
