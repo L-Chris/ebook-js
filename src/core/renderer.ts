@@ -35,6 +35,8 @@ export interface RendererStyles {
     maxInlineSize?: string
     /** Minimum column width — switch to single column below this (virtual-text renderer) */
     minColumnWidth?: string
+    /** Maximum column width per column (virtual-text renderer) */
+    maxColumnWidth?: string
     /** Maximum page height (for paginated mode) */
     maxBlockSize?: string
     /** Header/footer margin */

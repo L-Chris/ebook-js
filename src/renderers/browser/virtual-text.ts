@@ -326,11 +326,13 @@ export class VirtualTextRenderer implements Renderer {
         const margin = parseCSSPixels(this.styles.margin, DEFAULT_MARGIN)
         const gap = parseCSSPixels(this.styles.gap, DEFAULT_GAP)
         const minColumnWidth = parseCSSPixels(this.styles.minColumnWidth, 320)
+        const maxColumnWidth = parseCSSPixels(this.styles.maxColumnWidth, 720)
         const availableWidth = Math.max(1, this.scroller.clientWidth - margin * 2)
         const columns = this.getColumnCount(availableWidth, minColumnWidth, gap)
-        const inlineSize = columns > 1
-            ? Math.max(minColumnWidth, (availableWidth - gap * (columns - 1)) / columns)
+        const rawWidth = columns > 1
+            ? (availableWidth - gap * (columns - 1)) / columns
             : availableWidth
+        const inlineSize = Math.max(minColumnWidth, Math.min(maxColumnWidth, rawWidth))
         this.lines = layoutText(this.prepared, {
             inlineSize,
             lineHeight: this.getLineHeightPixels(),
