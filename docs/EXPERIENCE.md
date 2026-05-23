@@ -1,6 +1,6 @@
 # Experience & Lessons Learned
 
-Design rationale, patterns borrowed, and lessons from building ebook-js.
+Design rationale, patterns borrowed, and lessons from building rebook.
 
 ## AI-Friendly Design
 
@@ -55,7 +55,7 @@ SlateJS represents documents as a tree of `Element` and `Text` nodes. We do the 
 // SlateJS
 { type: 'paragraph', children: [{ text: 'Hello' }] }
 
-// ebook-js DocumentNode
+// rebook DocumentNode
 { type: 'p', children: [{ type: 'text', text: 'Hello' }] }
 ```
 
@@ -89,7 +89,7 @@ SlateJS plugins use `withX(editor)` to wrap the editor with new behavior:
 // SlateJS pattern
 const editor = withHistory(withReact(createEditor()))
 
-// ebook-js future pattern
+// rebook future pattern
 const doc = withTranslation(withAnnotations(baseDoc))
 ```
 
@@ -97,7 +97,7 @@ We haven't implemented this yet, but the Document Model is designed to support i
 
 ### What we didn't borrow
 
-- **Selection/Cursor**: ebook-js is for reading, not editing — no cursor state needed
+- **Selection/Cursor**: rebook is for reading, not editing — no cursor state needed
 - **Normalization**: SlateJS auto-normalizes invalid trees — we trust parser output
 - **Commands**: SlateJS has a command system — we use direct method calls
 - **React integration**: SlateJS is React-coupled — we're framework-agnostic
@@ -238,7 +238,7 @@ Each layer tries a broader recovery:
 
 ### Impact
 
-This recovery stack makes ebook-js handle ~90% of broken EPUB files that fail in other libraries, based on testing with real-world files from various sources.
+This recovery stack makes rebook handle ~90% of broken EPUB files that fail in other libraries, based on testing with real-world files from various sources.
 
 ## Performance Notes
 

@@ -1,11 +1,11 @@
 /**
- * ebook-js - A modular e-book parsing and rendering library
+ * rebook - A modular e-book parsing and rendering library
  *
  * @example
  * ```typescript
- * import { createReader } from 'ebook-js'
- * import { epub } from 'ebook-js/parsers/epub'
- * import { registry } from 'ebook-js'
+ * import { createReader } from 'rebook'
+ * import { epub } from 'rebook/parsers/epub'
+ * import { registry } from 'rebook'
  *
  * // Register parsers
  * registry.register('epub', epub)

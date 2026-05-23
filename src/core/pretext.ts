@@ -1,7 +1,7 @@
 /**
  * EPUB/XHTML to Pretext adapter.
  *
- * ebook-js owns document parsing and style extraction. Line breaking and text
+ * rebook owns document parsing and style extraction. Line breaking and text
  * measurement are delegated to @chenglou/pretext.
  */
 

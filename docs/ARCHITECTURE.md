@@ -1,12 +1,12 @@
 # Architecture
 
-Design decisions and architectural rationale for ebook-js.
+Design decisions and architectural rationale for rebook.
 
 ## Overview
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│                          ebook-js                             │
+│                          rebook                             │
 ├────────────────────────────┬─────────────────────────────────┤
 │         Parsers            │           Renderers             │
 │                            │                                 │
@@ -217,11 +217,11 @@ EPUB zip
   → TextSegment[] with inline style metadata
   → @chenglou/pretext prepareRichInline() for one-time Canvas measurement
   → @chenglou/pretext line range walking for width changes
-  → ebook-js LineRange[] with source segment/style mapping
+  → rebook LineRange[] with source segment/style mapping
   → virtual DOM rows, Canvas, SVG, or WebGL
 ```
 
-ebook-js does not implement the text measurement or Unicode line-breaking engine. That responsibility belongs to `@chenglou/pretext`. The local `src/core/pretext.ts` module is an adapter that:
+rebook does not implement the text measurement or Unicode line-breaking engine. That responsibility belongs to `@chenglou/pretext`. The local `src/core/pretext.ts` module is an adapter that:
 
 - extracts structural reading blocks and text/style segments from `DocumentNode`
 - converts each segment into a Pretext rich-inline item with a Canvas font string

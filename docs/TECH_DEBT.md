@@ -1,6 +1,6 @@
 # Technical Debt Register
 
-This document tracks known technical debt in ebook-js, including rationale for deferring fixes and plans for future resolution.
+This document tracks known technical debt in rebook, including rationale for deferring fixes and plans for future resolution.
 
 ---
 
@@ -237,7 +237,7 @@ The browser renderers are functional but intentionally limited:
 
 ### Why Not Implement Now?
 
-1. **Core library focus**: ebook-js is a parsing/rendering foundation, not a full reader
+1. **Core library focus**: rebook is a parsing/rendering foundation, not a full reader
 2. **Application-specific**: Annotations, search, and themes vary by use case
 3. **Resource constraints**: Limited development time
 4. **Renderer split is deliberate**: Virtual text optimizes predictable typography and small DOM; iframe optimizes EPUB CSS fidelity

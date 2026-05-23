@@ -1,4 +1,4 @@
-# ebook-js
+# rebook
 
 [English](./README.md) | [API 参考](./docs/API.md) | [架构设计](./docs/ARCHITECTURE.md) | [经验总结](./docs/EXPERIENCE.md)
 
@@ -21,7 +21,7 @@
 ## 安装
 
 ```bash
-npm install ebook-js
+npm install rebook
 ```
 
 ## 支持格式
@@ -36,11 +36,11 @@ npm install ebook-js
 ## 快速开始
 
 ```typescript
-import { registry, createReader, UnsupportedFormatError } from 'ebook-js'
-import { epub } from 'ebook-js/parsers/epub'
-import { mobi } from 'ebook-js/parsers/mobi'
-import { fb2 } from 'ebook-js/parsers/fb2'
-import { cbz } from 'ebook-js/parsers/cbz'
+import { registry, createReader, UnsupportedFormatError } from 'rebook'
+import { epub } from 'rebook/parsers/epub'
+import { mobi } from 'rebook/parsers/mobi'
+import { fb2 } from 'rebook/parsers/fb2'
+import { cbz } from 'rebook/parsers/cbz'
 
 // 注册解析器（支持自动检测格式）
 registry.register('epub', epub)
@@ -105,7 +105,7 @@ const html = newDoc.serialize()
 需要快速调整样式或做虚拟列表渲染时，可以从 EPUB 章节直接取得结构块和样式片段，先离屏测量一次，再在视口变化或字体缩放时只做内存中的行切片：
 
 ```typescript
-import { prepareBlocks, layout, getVisibleLines } from 'ebook-js'
+import { prepareBlocks, layout, getVisibleLines } from 'rebook'
 
 const blocks = await book.sections[0].getBlocks!()
 const prepared = prepareBlocks(blocks, {
@@ -138,7 +138,7 @@ npm test          # 运行测试
 
 ## 与 foliate-js 的对比
 
-| 特性 | foliate-js | ebook-js |
+| 特性 | foliate-js | rebook |
 |------|-----------|----------|
 | 语言 | JavaScript | TypeScript |
 | 架构 | 单体 view.js | 解析器/渲染器分离 |

@@ -1,6 +1,6 @@
 # API Reference
 
-Complete API documentation for ebook-js.
+Complete API documentation for rebook.
 
 ## Table of Contents
 
@@ -26,7 +26,7 @@ Complete API documentation for ebook-js.
 The central hub for registering and auto-detecting parsers.
 
 ```typescript
-import { registry } from 'ebook-js'
+import { registry } from 'rebook'
 
 // Register a parser factory
 registry.register('epub', epub)
@@ -66,7 +66,7 @@ Returns an array of registered parser names.
 High-level API combining parser registry, renderer, and navigation.
 
 ```typescript
-import { createReader } from 'ebook-js'
+import { createReader } from 'rebook'
 
 const reader = createReader({
     container: document.getElementById('viewer')!,
@@ -341,7 +341,7 @@ interface DocumentResource {
 All mutations are **immutable** — they return a new `SectionDocument` without modifying the original.
 
 ```typescript
-import { textNode, elementNode } from 'ebook-js'
+import { textNode, elementNode } from 'rebook'
 
 // Path is an array of indices into the tree
 // [0] = first root node
@@ -382,7 +382,7 @@ import {
     isElementNode,
     parseHTML,
     createSectionDocument,
-} from 'ebook-js'
+} from 'rebook'
 
 // Create nodes
 const text = textNode('Hello world')
@@ -418,10 +418,10 @@ The Document Model enables these AI-powered workflows:
 
 ## Pretext Layout
 
-ebook-js integrates the community package `@chenglou/pretext` instead of implementing text measurement itself. The library extracts EPUB/XHTML structure into styled `TextSegment[]`, then delegates measurement and line breaking to Pretext.
+rebook integrates the community package `@chenglou/pretext` instead of implementing text measurement itself. The library extracts EPUB/XHTML structure into styled `TextSegment[]`, then delegates measurement and line breaking to Pretext.
 
 ```typescript
-import { prepareBlocks, layout, getVisibleLines } from 'ebook-js'
+import { prepareBlocks, layout, getVisibleLines } from 'rebook'
 
 const blocks = await section.getBlocks!()
 const prepared = prepareBlocks(blocks, {
@@ -544,10 +544,10 @@ interface ParserOptions {
 ### Parser Factories
 
 ```typescript
-import { epub } from 'ebook-js/parsers/epub'    // or from 'ebook-js'
-import { mobi } from 'ebook-js/parsers/mobi'    // or from 'ebook-js'
-import { fb2 } from 'ebook-js/parsers/fb2'      // or from 'ebook-js'
-import { cbz } from 'ebook-js/parsers/cbz'      // or from 'ebook-js'
+import { epub } from 'rebook/parsers/epub'    // or from 'rebook'
+import { mobi } from 'rebook/parsers/mobi'    // or from 'rebook'
+import { fb2 } from 'rebook/parsers/fb2'      // or from 'rebook'
+import { cbz } from 'rebook/parsers/cbz'      // or from 'rebook'
 
 // Each returns a Parser instance
 const parser = epub()
@@ -556,7 +556,7 @@ const parser = epub()
 ### Direct Parser Usage
 
 ```typescript
-import { EPUBParser } from 'ebook-js'
+import { EPUBParser } from 'rebook'
 
 const parser = new EPUBParser()
 if (await parser.canParse(file)) {
@@ -586,7 +586,7 @@ interface Renderer {
 ### Browser Renderer
 
 ```typescript
-import { BrowserRenderer, createBrowserRenderer } from 'ebook-js'
+import { BrowserRenderer, createBrowserRenderer } from 'rebook'
 
 // Factory function (recommended)
 const renderer = createBrowserRenderer({
@@ -620,7 +620,7 @@ In virtual-text spread mode, rows are flowed into left and right columns per vie
 `VirtualTextRenderer` consumes `section.getBlocks()`, Pretext prepared blocks, and `LineRange[]` to render only the visible text rows as simple DOM spans. It supports auto-spread two-column layout through `maxColumnCount`, `maxInlineSize`, `gap`, and `setSpread()`.
 
 ```typescript
-import { createVirtualTextRenderer } from 'ebook-js'
+import { createVirtualTextRenderer } from 'rebook'
 
 const renderer = createVirtualTextRenderer({
     container: document.getElementById('viewer')!,
@@ -677,16 +677,16 @@ interface URLFactory {
 
 | Adapter | Import | Environment |
 |---------|--------|-------------|
-| `BrowserDOMAdapter` | `ebook-js` | Browser |
-| `BrowserURLFactory` | `ebook-js` | Browser |
-| `TestDOMAdapter` | `ebook-js/adapters/test` | Node.js (@xmldom/xmldom) |
-| `TestURLFactory` | `ebook-js/adapters/test` | Node.js (fake URLs) |
+| `BrowserDOMAdapter` | `rebook` | Browser |
+| `BrowserURLFactory` | `rebook` | Browser |
+| `TestDOMAdapter` | `rebook/adapters/test` | Node.js (@xmldom/xmldom) |
+| `TestURLFactory` | `rebook/adapters/test` | Node.js (fake URLs) |
 
 ### Browser Usage (auto-wired)
 
 ```typescript
-import { createReader, registry } from 'ebook-js'
-import { epub } from 'ebook-js/parsers/epub'
+import { createReader, registry } from 'rebook'
+import { epub } from 'rebook/parsers/epub'
 
 registry.register('epub', epub)
 const reader = createReader({ container: element })
@@ -696,9 +696,9 @@ await reader.open(file) // Browser adapters auto-injected
 ### Node.js / Worker Usage
 
 ```typescript
-import { registry } from 'ebook-js'
-import { epub } from 'ebook-js/parsers/epub'
-import { TestDOMAdapter, TestURLFactory } from 'ebook-js/adapters/test'
+import { registry } from 'rebook'
+import { epub } from 'rebook/parsers/epub'
+import { TestDOMAdapter, TestURLFactory } from 'rebook/adapters/test'
 
 registry.register('epub', epub)
 
@@ -714,13 +714,13 @@ const book = await registry.open(arrayBuffer, {
 
 ```typescript
 import {
-    EBookError,            // Base class for all ebook-js errors
+    EBookError,            // Base class for all rebook errors
     ParseError,            // Parsing failed (malformed content)
     UnsupportedFormatError, // Format not recognized
     CorruptedFileError,    // File is severely corrupted
     AdapterRequiredError,  // Required adapter not provided
     UnsupportedInputError, // Input type not supported
-} from 'ebook-js'
+} from 'rebook'
 ```
 
 ### Error Properties
@@ -786,7 +786,7 @@ import {
     normalizePublisher,     // (input) => string
     normalizeContributors,  // (input) => Contributor[]
     normalizeSubjects,      // (input) => string[]
-} from 'ebook-js'
+} from 'rebook'
 ```
 
 ---
@@ -834,7 +834,7 @@ reader.setStyles({
 FB2 is pure XML without embedded CSS. Use the default stylesheet:
 
 ```typescript
-import { fb2DefaultStyles } from 'ebook-js'
+import { fb2DefaultStyles } from 'rebook'
 
 reader.setStyles({ css: fb2DefaultStyles })
 
@@ -847,7 +847,7 @@ reader.setStyles({ css: fb2DefaultStyles + 'p { color: #333; }' })
 Legacy MOBI6 files (`.mobi`) lack embedded stylesheets:
 
 ```typescript
-import { mobi6DefaultStyles } from 'ebook-js'
+import { mobi6DefaultStyles } from 'rebook'
 
 reader.setStyles({ css: mobi6DefaultStyles })
 ```

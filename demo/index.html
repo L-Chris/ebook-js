@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ebook-js Demo</title>
+    <title>rebook Demo</title>
     <style>
         * {
             margin: 0;
@@ -267,7 +267,7 @@
     <!-- Header -->
     <header>
         <button id="btn-sidebar" title="Toggle sidebar">☰</button>
-        <h1 id="book-title">ebook-js Demo</h1>
+        <h1 id="book-title">rebook Demo</h1>
         <div class="controls">
             <select id="renderer-select">
                 <option value="virtual-text" selected>Virtual Text</option>
@@ -476,7 +476,7 @@
                 // Update UI
                 const title = formatLanguageMap(book.metadata?.title) || 'Untitled'
                 bookTitle.textContent = title
-                document.title = `${title} - ebook-js`
+                document.title = `${title} - rebook`
 
                 // Render TOC
                 tocList.innerHTML = ''

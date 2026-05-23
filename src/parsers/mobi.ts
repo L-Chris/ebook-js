@@ -1,7 +1,7 @@
 /**
  * MOBI / AZW / AZW3 parser.
  *
- * Ports foliate-js mobi.js to TypeScript with ebook-js architecture.
+ * Ports foliate-js mobi.js to TypeScript with rebook architecture.
  * Supports both legacy Mobipocket (MOBI6, version < 8) and modern
  * Kindle Format 8 (KF8/AZW3, version >= 8).
  *

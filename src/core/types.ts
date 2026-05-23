@@ -1,5 +1,5 @@
 /**
- * Core types for the ebook-js library.
+ * Core types for the rebook library.
  * These define the contract between parsers and renderers.
  */
 

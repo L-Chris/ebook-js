@@ -1,10 +1,10 @@
 /**
- * Error types for the ebook-js library.
+ * Error types for the rebook library.
  * Provides a hierarchy of errors for better error handling and debugging.
  */
 
 /**
- * Base error class for all ebook-js errors.
+ * Base error class for all rebook errors.
  */
 export class EBookError extends Error {
     constructor(message: string, public code: string) {

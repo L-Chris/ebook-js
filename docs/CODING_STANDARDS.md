@@ -1,4 +1,4 @@
-# Coding Standards — ebook-js
+# Coding Standards — rebook
 
 ## 1. TypeScript Conventions
 
@@ -215,7 +215,7 @@ Test adapters MUST NOT be exported from production barrel files:
 ```typescript
 // src/adapters/index.ts — Correct
 export { BrowserDOMAdapter, BrowserURLFactory } from './browser'
-// Test adapters: import from 'ebook-js/adapters/test'
+// Test adapters: import from 'rebook/adapters/test'
 
 // Incorrect
 export { BrowserDOMAdapter, TestDOMAdapter } from './adapters'

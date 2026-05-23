@@ -1,4 +1,4 @@
-# ebook-js
+# rebook
 
 [中文文档](./README.zh-CN.md) | [API Reference](./docs/API.md) | [Architecture](./docs/ARCHITECTURE.md) | [Experience & Lessons](./docs/EXPERIENCE.md)
 
@@ -21,7 +21,7 @@ Inspired by [foliate-js](https://github.com/johnfactotum/foliate-js), but restru
 ## Installation
 
 ```bash
-npm install ebook-js
+npm install rebook
 ```
 
 ## Supported Formats
@@ -36,11 +36,11 @@ npm install ebook-js
 ## Quick Start
 
 ```typescript
-import { registry, createReader, UnsupportedFormatError } from 'ebook-js'
-import { epub } from 'ebook-js/parsers/epub'
-import { mobi } from 'ebook-js/parsers/mobi'
-import { fb2 } from 'ebook-js/parsers/fb2'
-import { cbz } from 'ebook-js/parsers/cbz'
+import { registry, createReader, UnsupportedFormatError } from 'rebook'
+import { epub } from 'rebook/parsers/epub'
+import { mobi } from 'rebook/parsers/mobi'
+import { fb2 } from 'rebook/parsers/fb2'
+import { cbz } from 'rebook/parsers/cbz'
 
 // Register parsers for auto-detection
 registry.register('epub', epub)
@@ -105,7 +105,7 @@ This enables AI-powered workflows: translation, content summarization, annotatio
 For renderers that need fast style changes or virtualized text, EPUB sections expose structural blocks and styled segments that can be measured once and laid out repeatedly without reflowing a full chapter DOM:
 
 ```typescript
-import { prepare, layout, getVisibleLines } from 'ebook-js'
+import { prepare, layout, getVisibleLines } from 'rebook'
 
 const blocks = await book.sections[0].getBlocks!()
 const prepared = prepareBlocks(blocks, {
@@ -138,7 +138,7 @@ npm test          # Run tests
 
 ## Comparison with foliate-js
 
-| Feature | foliate-js | ebook-js |
+| Feature | foliate-js | rebook |
 |---------|-----------|----------|
 | Language | JavaScript | TypeScript |
 | Architecture | Monolithic view.js | Separated parser/renderer |
