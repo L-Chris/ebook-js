@@ -519,6 +519,9 @@ class ResourceLoader {
             }
 
             for (const el of doc.querySelectorAll('link[href]')) await replace(el, 'href')
+            for (const el of doc.querySelectorAll('[href]')) {
+                if (!isNavigationHrefElement(el)) await replace(el, 'href')
+            }
             for (const el of doc.querySelectorAll('[src]')) await replace(el, 'src')
             for (const el of doc.querySelectorAll('[poster]')) await replace(el, 'poster')
             for (const el of doc.querySelectorAll('object[data]')) await replace(el, 'data')
@@ -626,6 +629,11 @@ class ResourceLoader {
         this.cache.clear()
         this.refCount.clear()
     }
+}
+
+function isNavigationHrefElement(el: XMLElement): boolean {
+    const name = el.localName.toLowerCase()
+    return name === 'a' || name === 'area' || name === 'link'
 }
 
 // ============================================================================

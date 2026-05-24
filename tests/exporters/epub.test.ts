@@ -169,7 +169,7 @@ describe('EPUB first-pages exporter', () => {
                 {
                     id: 'chapter1',
                     title: 'Chapter 1',
-                    content: '<html xmlns="http://www.w3.org/1999/xhtml"><body><h1>Chapter 1</h1><img src="images/pic.png" alt="pic"/></body></html>',
+                    content: '<html xmlns="http://www.w3.org/1999/xhtml"><body><h1>Chapter 1</h1><img src="images/pic.png" alt="pic"/><svg xmlns="http://www.w3.org/2000/svg"><image href="images/pic.png"/></svg></body></html>',
                 },
             ],
             resources: [
@@ -183,6 +183,7 @@ describe('EPUB first-pages exporter', () => {
         const image = await loader.loadBlob('OEBPS/images/resource-1.png')
         const opf = await loader.loadText('OEBPS/content.opf')
         const parsed = await epub().parse(await exported.arrayBuffer(), parserOptions)
+        const loaded = await parsed.sections[0].load()
         const blocks = await parsed.sections[0].getBlocks?.()
         const imageBlock = blocks?.find(block => block.type === 'image')
 
@@ -194,6 +195,8 @@ describe('EPUB first-pages exporter', () => {
         expect(imageBlock?.image?.src.startsWith('test://resource-')).toBe(true)
         expect(imageBlock?.image?.src).not.toContain('images/resource-1.png')
         expect(imageBlock?.image?.originalSrc).toBe('OEBPS/images/resource-1.png')
+        expect(loaded).not.toContain('href="../images/resource-1.png"')
+        expect(loaded).toMatch(/<image[^>]+href="test:\/\/resource-/)
     })
 
     it('can parse a raw supported source through the registry before exporting', async () => {
