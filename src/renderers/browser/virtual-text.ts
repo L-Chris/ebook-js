@@ -367,12 +367,14 @@ export class VirtualTextRenderer implements Renderer {
             pageCount,
         }
         this.pageIndex = Math.min(this.pageIndex, pageCount - 1)
+        const contentWidth = inlineSize * columns + gap * (columns - 1)
+        const contentLeft = Math.max(0, (this.scroller.clientWidth - contentWidth) / 2)
         this.spacer.style.height = `${totalHeight}px`
         this.content.style.marginInline = '0'
         this.content.style.maxWidth = ''
-        this.content.style.left = `${margin}px`
+        this.content.style.left = `${contentLeft}px`
         this.content.style.right = 'auto'
-        this.content.style.width = `${inlineSize * columns + gap * (columns - 1)}px`
+        this.content.style.width = `${contentWidth}px`
         this.renderVisibleLines()
     }
 

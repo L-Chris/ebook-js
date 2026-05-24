@@ -23,6 +23,10 @@ class BrowserXMLNode implements XMLNode {
     return this.node.textContent
   }
 
+  set textContent(value: string | null) {
+    this.node.textContent = value
+  }
+
   get parentNode(): XMLElement | null {
     return this.node.parentNode && this.node.parentNode.nodeType === Node.ELEMENT_NODE
       ? new BrowserXMLElement(this.node.parentNode as Element)
@@ -44,6 +48,10 @@ class BrowserXMLText extends BrowserXMLNode implements XMLText {
 
   get textContent(): string {
     return (this.node as Text).textContent || ''
+  }
+
+  set textContent(value: string) {
+    (this.node as Text).textContent = value
   }
 }
 
@@ -73,6 +81,10 @@ class BrowserXMLElement extends BrowserXMLNode implements XMLElement {
 
   get textContent(): string | null {
     return this.node.textContent
+  }
+
+  set textContent(value: string | null) {
+    this.node.textContent = value
   }
 
   get attributes(): XMLAttr[] {

@@ -49,6 +49,30 @@ describe('EPUB Pretext segments', () => {
         expect(blocks?.[0].segments.some(segment => segment.style?.fontWeight === '700')).toBe(true)
     })
 
+    it('rewrites inline style elements without adapter textContent errors', async () => {
+        const parser = new EPUBParser()
+        const book = await parser.parse(await createTestEPUB({
+            chapters: [{
+                id: 'styled-css',
+                title: 'Styled CSS',
+                content: '<html xmlns="http://www.w3.org/1999/xhtml"><head><style>body { background-image: url("images/bg.png"); }</style></head><body><p>Hello</p></body></html>',
+            }],
+            resources: [{
+                id: 'bg-image',
+                href: 'images/bg.png',
+                mediaType: 'image/png',
+                data: new Uint8Array([0x89, 0x50, 0x4e, 0x47]),
+            }],
+        }), {
+            domAdapter: new TestDOMAdapter(),
+            urlFactory: new TestURLFactory(),
+        })
+
+        const html = await book.sections[0].load()
+
+        expect(html).toContain('background-image: url("test://resource-')
+    })
+
     it('can prepare and layout a real EPUB from data/', async () => {
         const parser = new EPUBParser()
         const data = await readFile('data/1.epub')
@@ -77,6 +101,26 @@ describe('EPUB Pretext segments', () => {
         expect(lines.length).toBeGreaterThan(0)
         expect(lines[0].segments.length).toBeGreaterThan(0)
         expect(lines.every(line => line.width <= 360 || line.segments.length === 1)).toBe(true)
+    })
+
+    it('loads text blocks from data/4.epub', async () => {
+        const parser = new EPUBParser()
+        const data = await readFile('data/4.epub')
+        const book = await parser.parse(data.buffer.slice(
+            data.byteOffset,
+            data.byteOffset + data.byteLength,
+        ), {
+            domAdapter: new TestDOMAdapter(),
+            urlFactory: new TestURLFactory(),
+        })
+
+        let blockCount = 0
+        for (const section of book.sections) {
+            const blocks = await section.getBlocks?.()
+            blockCount += blocks?.length ?? 0
+        }
+
+        expect(blockCount).toBeGreaterThan(0)
     })
 
     it('exposes image blocks with renderable URLs and cover hints', async () => {

@@ -85,6 +85,13 @@ function getElementChildren(el: XmldomElement): XmldomElement[] {
   return children
 }
 
+function normalizeHTMLVoidTags(str: string): string {
+  return str.replace(
+    /<(area|base|br|col|embed|hr|img|input|link|meta|param|source|track|wbr)(\s[^<>]*?)?>/gi,
+    (match, tagName: string, attrs = '') => match.endsWith('/>') ? match : `<${tagName}${attrs}/>`
+  )
+}
+
 /**
  * Wrapper for xmldom Element to satisfy XMLElement interface.
  */
@@ -117,6 +124,10 @@ class XmldomXMLElement implements XMLElement {
 
   get textContent(): string | null {
     return this.el.textContent
+  }
+
+  set textContent(value: string | null) {
+    this.el.textContent = value
   }
 
   get attributes(): XMLAttr[] {
@@ -365,7 +376,7 @@ export class TestDOMAdapter implements DOMAdapter {
   parseHTML(str: string, _mimeType: string = 'text/html'): XMLDocument {
     // For tests, use XML parser for HTML as well
     const parser = new this.DOMParser()
-    const doc = parser.parseFromString(str, 'text/html')
+    const doc = parser.parseFromString(normalizeHTMLVoidTags(str), 'text/html')
     return new XmldomXMLDocument(doc)
   }
 

@@ -491,7 +491,13 @@ class ResourceLoader {
         // Parse and replace in HTML/XHTML/SVG
         const htmlTypes: string[] = [MIME.XHTML, MIME.HTML, MIME.SVG]
         if (htmlTypes.includes(mediaType)) {
-            let doc = this.domAdapter.parseXML(str)
+            let doc: XMLDocument
+            try {
+                doc = this.domAdapter.parseXML(str)
+            } catch (error) {
+                if (mediaType !== MIME.XHTML && mediaType !== MIME.HTML) throw error
+                doc = this.domAdapter.parseHTML(str, MIME.HTML)
+            }
 
             // Change to HTML if XHTML is invalid
             if (mediaType === MIME.XHTML && (
