@@ -45,64 +45,6 @@ const findAllByTag = (el: XMLElement, tagName: string): XMLElement[] => {
 }
 
 // ============================================================================
-// Default FB2 stylesheet (for renderers)
-// ============================================================================
-
-/**
- * Default stylesheet for FB2 content.
- * Renderers can use this via `renderer.setStyles({ css: fb2DefaultStyles })`.
- * Users can also provide their own styles instead.
- */
-export const fb2DefaultStyles = `
-body > img, section > img {
-    display: block;
-    margin: auto;
-}
-.title h1 {
-    text-align: center;
-}
-body > section > .title, body.notesBodyType > .title {
-    margin: 3em 0;
-}
-body.notesBodyType > section .title h1 {
-    text-align: start;
-}
-body.notesBodyType > section .title {
-    margin: 1em 0;
-}
-p {
-    text-indent: 1em;
-    margin: 0;
-}
-:not(p) + p, p:first-child {
-    text-indent: 0;
-}
-.stanza {
-    text-indent: 0;
-    margin: 1em 0;
-}
-.text-author, .date {
-    text-align: end;
-}
-.text-author:before {
-    content: "\\2014";
-}
-table {
-    border-collapse: collapse;
-}
-td, th {
-    padding: .25em;
-}
-a[epub|type~="noteref"] {
-    font-size: .75em;
-    vertical-align: super;
-}
-body:not(.notesBodyType) > .title, body:not(.notesBodyType) > .epigraph {
-    margin: 3em 0;
-}
-`
-
-// ============================================================================
 // FB2 to XHTML Converter
 // ============================================================================
 

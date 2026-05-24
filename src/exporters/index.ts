@@ -1,7 +1,13 @@
 import { exporterRegistry } from '../core/exporter'
 import { epubExporter } from './epub'
+import { cbzExporter } from './cbz'
+import { txtExporter } from './txt'
+import { htmlExporter } from './html'
 
 exporterRegistry.register('epub', epubExporter)
+exporterRegistry.register('cbz', cbzExporter)
+exporterRegistry.register('txt', txtExporter)
+exporterRegistry.register('html', htmlExporter)
 
 export {
     exportBook,
@@ -15,6 +21,18 @@ export {
     EPUBExporter,
     epubExporter,
 } from './epub'
+export {
+    CBZExporter,
+    cbzExporter,
+} from './cbz'
+export {
+    TXTExporter,
+    txtExporter,
+} from './txt'
+export {
+    HTMLExporter,
+    htmlExporter,
+} from './html'
 export type {
     Exporter,
     ExporterFactory,
