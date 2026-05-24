@@ -7,7 +7,6 @@ import type { Book, RelocateEvent, LoadEvent, TOCItem } from '../../core/types'
 import type { ParserInput, ParserOptions } from '../../core/parser'
 import type { RendererConfig, RendererStyles, LayoutMode, Renderer } from '../../core/renderer'
 import { registry } from '../../core/parser'
-import { BrowserRenderer } from './paginator'
 import { VirtualTextRenderer } from './virtual-text'
 import { BrowserDOMAdapter, BrowserURLFactory } from '../../adapters/browser'
 
@@ -21,9 +20,8 @@ export interface ReaderConfig extends Omit<RendererConfig, 'container'> {
     /**
      * Browser rendering backend.
      * Default: 'virtual-text' (AST -> preset blocks -> Pretext -> visible DOM rows).
-     * Use 'iframe' to opt back into the legacy EPUB CSS/iframe paginator.
      */
-    renderer?: 'virtual-text' | 'iframe'
+    renderer?: 'virtual-text'
     /** Parser options */
     parserOptions?: ParserOptions
     /** Auto-register default parsers */
@@ -37,6 +35,11 @@ export class ReaderView {
     private renderer: Renderer
     private book: Book | null = null
     private config: ReaderConfig
+    private registeredListeners: Array<{
+        event: string
+        listener: (e: any) => void
+        wrappedListener: (e: any) => void
+    }> = []
 
     constructor(config: ReaderConfig) {
         this.config = config
@@ -159,7 +162,51 @@ export class ReaderView {
      * Get current reading location.
      */
     getLocation(): RelocateEvent | null {
-        return this.renderer.getLocation()
+        const location = this.renderer.getLocation()
+        if (location && !location.tocItem) {
+            location.tocItem = this.getCurrentTOCItem(location)
+        }
+        return location
+    }
+
+    /**
+     * Get current TOC item based on location
+     */
+    getCurrentTOCItem(location?: RelocateEvent | null): TOCItem | null {
+        if (!this.book || !this.book.toc) return null
+        const loc = location ?? this.getLocation()
+        if (!loc) return null
+
+        let activeItem: TOCItem | null = null
+        let maxIndex = -1
+
+        const checkItem = (item: TOCItem) => {
+            if (this.book!.splitTOCHref) {
+                try {
+                    const parts = this.book!.splitTOCHref(item.href)
+                    if (parts && Array.isArray(parts)) {
+                        const [id] = parts
+                        const index = this.book!.sections.findIndex(s => s.id === id)
+                        if (index >= 0) {
+                            if (index <= loc.index && index >= maxIndex) {
+                                maxIndex = index
+                                activeItem = item
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.error('Error in splitTOCHref:', e)
+                }
+            }
+            if (item.subitems) {
+                for (const sub of item.subitems) checkItem(sub)
+            }
+        }
+
+        for (const item of this.book.toc) {
+            checkItem(item)
+        }
+        return activeItem
     }
 
     /**
@@ -192,14 +239,30 @@ export class ReaderView {
     on(event: 'link', listener: (e: { href: string; external: boolean }) => void): void
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     on(event: string, listener: (e: any) => void): void {
-        this.renderer.on(event, listener as (e: unknown) => void)
+        let wrappedListener = listener
+        if (event === 'relocate') {
+            wrappedListener = (e: RelocateEvent) => {
+                if (!e.tocItem) e.tocItem = this.getCurrentTOCItem(e)
+                listener(e)
+            }
+        }
+
+        this.renderer.on(event, wrappedListener)
+        this.registeredListeners.push({ event, listener, wrappedListener })
     }
 
     /**
      * Remove an event listener.
      */
     off(event: string, listener: (e: unknown) => void): void {
-        this.renderer.off(event, listener)
+        const index = this.registeredListeners.findIndex(
+            item => item.event === event && item.listener === listener
+        )
+        if (index >= 0) {
+            const { wrappedListener } = this.registeredListeners[index]
+            this.renderer.off(event, wrappedListener)
+            this.registeredListeners.splice(index, 1)
+        }
     }
 
     /**
@@ -216,17 +279,20 @@ export class ReaderView {
     destroy(): void {
         this.close()
         this.renderer.destroy()
+        this.registeredListeners = []
     }
 
     private createRenderer(): Renderer {
-        return this.config.renderer === 'iframe'
-            ? new BrowserRenderer(this.config)
-            : new VirtualTextRenderer(this.config)
+        return new VirtualTextRenderer(this.config)
     }
 
     private resetRenderer(): void {
         this.renderer.destroy()
         this.renderer = this.createRenderer()
+        // Re-bind all registered listeners to the new renderer
+        for (const item of this.registeredListeners) {
+            this.renderer.on(item.event, item.wrappedListener)
+        }
     }
 }
 

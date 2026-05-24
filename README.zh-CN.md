@@ -14,7 +14,7 @@
 - **AI 友好的文档模型**：受 SlateJS 启发的树形结构，提供查询和修改 API，支持内容操作（翻译、标注、重构）
 - **Pretext 排版管线**：EPUB 章节可输出带样式文本片段，支持一次测量、多次纯内存行切片
 - **环境无关的解析器**：所有解析器通过适配器注入，可在浏览器、Node.js 或 Worker 中运行
-- **浏览器渲染器**：默认使用 AST/Pretext 虚拟文本渲染器，并保留旧 iframe 分页渲染器作为 fallback
+- **浏览器渲染器**：默认使用高性能的 AST/Pretext 虚拟文本渲染器
 - **畸形 EPUB 容错**：多层回退策略处理损坏的 zip 归档
 - **框架无关**：核心库兼容任意框架；React/Vue 封装计划中
 
@@ -62,9 +62,6 @@ const reader = createReader({
 const book = await reader.open(file)
 await reader.next()
 await reader.goTo('/path/to/chapter.xhtml#section')
-
-// 需要保留 EPUB CSS/iframe 分页时，可以显式切回旧渲染器
-const iframeReader = createReader({ container, renderer: 'iframe', layout: 'paginated' })
 ```
 
 ### 浏览器渲染
@@ -72,8 +69,6 @@ const iframeReader = createReader({ container, renderer: 'iframe', layout: 'pagi
 `createReader()` 默认使用 `VirtualTextRenderer`。它会把 XHTML 解析成结构化阅读块（`chapter`、`heading`、`paragraph`、`listItem`、`blockquote`、`pre`），套用适合中英文阅读的预设文本样式，用 Pretext 做测量和行切片，然后只渲染可视区行。
 
 在 `paginated` 布局下，滚轮和 `next()` / `prev()` 会按视口高度翻页，不再自由垂直漂移。宽屏时支持自动双列阅读：当可用宽度能容纳 `2 × maxInlineSize + gap` 时，可视行会分布到左右两列，并保留页内上下留白，避免文字贴到裁切边缘。`reader.setSpread(1)` 强制单列，`reader.setSpread(2)` 恢复自动双列。
-
-设置 `renderer: 'iframe'` 可以使用旧 iframe 渲染器，保留 EPUB CSS 和自动双页分页。
 
 ## 文档模型（AI 友好）
 

@@ -21,6 +21,7 @@ import { replaceSeries, unescapeHTML } from '../core/utils'
 import { UnsupportedInputError, ParseError, CorruptedFileError, AdapterRequiredError } from '../core/errors'
 import { normalizeContributors } from '../core/metadata'
 import { parseHTML, createSectionDocument } from '../core/document'
+import { extractDocumentBlocks, extractDocumentSegments } from '../core/pretext'
 
 // ============================================================================
 // Constants
@@ -917,6 +918,20 @@ class MOBI6 {
                 const nodes = parseHTML(html, this.#domAdapter)
                 return createSectionDocument(nodes, this.#domAdapter)
             },
+            getSegments: async () => {
+                const html = await this.createDocument(section)
+                if (!this.#domAdapter) return []
+                const nodes = parseHTML(html, this.#domAdapter)
+                return extractDocumentSegments(nodes)
+            },
+            getBlocks: async () => {
+                const html = await this.loadSection(section)
+                if (!this.#domAdapter) return []
+                const nodes = parseHTML(html, this.#domAdapter)
+                return extractDocumentBlocks(nodes, {}, {
+                    coverImageSrcs: [],
+                })
+            },
             size: section.end - section.start,
         }))
 
@@ -1313,6 +1328,20 @@ class KF8 {
                     if (!this.#domAdapter) return null
                     const nodes = parseHTML(html, this.#domAdapter)
                     return createSectionDocument(nodes, this.#domAdapter)
+                },
+                getSegments: async () => {
+                    const html = await this.createDocument(section)
+                    if (!this.#domAdapter) return []
+                    const nodes = parseHTML(html, this.#domAdapter)
+                    return extractDocumentSegments(nodes)
+                },
+                getBlocks: async () => {
+                    const html = await this.loadSection(section)
+                    if (!this.#domAdapter) return []
+                    const nodes = parseHTML(html, this.#domAdapter)
+                    return extractDocumentBlocks(nodes, {}, {
+                        coverImageSrcs: [],
+                    })
                 },
                 size: section.length,
             }) : ({ id: `nonlinear-${index}`, size: 0, linear: 'no', load: () => '' }))

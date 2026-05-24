@@ -14,7 +14,7 @@ Inspired by [foliate-js](https://github.com/johnfactotum/foliate-js), but restru
 - **AI-friendly Document Model**: SlateJS-inspired tree structure with query and mutation APIs for content manipulation (translation, annotation, restructuring)
 - **Pretext layout pipeline**: EPUB sections can expose styled text segments for one-time measurement and pure in-memory line slicing
 - **Environment-agnostic parsers**: All parsers run in browser, Node.js, or workers via adapter injection
-- **Browser renderer**: Default AST/Pretext virtual text renderer with a legacy iframe paginator fallback
+- **Browser renderer**: Fast AST/Pretext virtual text renderer built-in
 - **Malformed EPUB recovery**: Multi-layer fallback for broken zip archives
 - **Framework-agnostic**: Core library works with any framework; React/Vue wrappers coming
 
@@ -62,9 +62,6 @@ const reader = createReader({
 const book = await reader.open(file)
 await reader.next()
 await reader.goTo('/path/to/chapter.xhtml#section')
-
-// Opt into the legacy iframe paginator when you need EPUB CSS fidelity
-const iframeReader = createReader({ container, renderer: 'iframe', layout: 'paginated' })
 ```
 
 ### Browser Rendering
@@ -72,8 +69,6 @@ const iframeReader = createReader({ container, renderer: 'iframe', layout: 'pagi
 `createReader()` uses `VirtualTextRenderer` by default. It parses XHTML into structural reading blocks (`chapter`, `heading`, `paragraph`, `listItem`, `blockquote`, `pre`), applies preset Chinese/English-friendly text styles, uses Pretext for measurement/layout, and renders only the visible line rows.
 
 In `paginated` layout, wheel and `next()` / `prev()` turn viewport-height pages instead of allowing free vertical drift. On wide containers it supports auto-spread two-column reading: when the available width fits `2 × maxInlineSize + gap`, visible rows are flowed into left and right columns with page padding so text does not touch the clipped edge. `reader.setSpread(1)` forces single column, and `reader.setSpread(2)` restores auto-spread.
-
-Set `renderer: 'iframe'` to use the legacy iframe renderer with EPUB CSS and auto-spread pagination.
 
 ## Document Model (AI-friendly)
 

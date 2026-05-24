@@ -136,6 +136,48 @@
             padding-left: 16px;
         }
 
+        /* TOC Tree */
+        .toc-list ul {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+        }
+        .toc-list li {
+            margin: 2px 0;
+        }
+        .toc-list details > summary {
+            cursor: pointer;
+            list-style: none;
+            display: flex;
+            align-items: center;
+        }
+        .toc-list details > summary::-webkit-details-marker {
+            display: none;
+        }
+        .toc-list details > summary::before {
+            content: '▶';
+            font-size: 10px;
+            margin-right: 6px;
+            color: #888;
+            transition: transform 0.2s;
+            display: inline-block;
+            width: 12px;
+            text-align: center;
+        }
+        .toc-list details[open] > summary::before {
+            transform: rotate(90deg);
+        }
+        .toc-list details > ul {
+            padding-left: 18px;
+        }
+        .toc-list .toc-item {
+            flex: 1;
+        }
+        .toc-list summary .toc-item {
+            padding-left: 0;
+            display: inline-block;
+        }
+
         /* Viewer */
         #viewer-container {
             flex: 1;
@@ -269,10 +311,6 @@
         <button id="btn-sidebar" title="Toggle sidebar">☰</button>
         <h1 id="book-title">rebook Demo</h1>
         <div class="controls">
-            <select id="renderer-select">
-                <option value="virtual-text" selected>Virtual Text</option>
-                <option value="iframe">Iframe</option>
-            </select>
             <select id="layout-select">
                 <option value="paginated" selected>Paginated</option>
                 <option value="scrolled">Scrolled</option>
@@ -315,7 +353,7 @@
         <!-- Sidebar -->
         <aside class="sidebar" id="sidebar">
             <h2>Table of Contents</h2>
-            <div id="toc-list"></div>
+            <div id="toc-list" class="toc-list"></div>
         </aside>
 
         <!-- Viewer -->
@@ -379,7 +417,6 @@
         const sidebar = document.getElementById('sidebar')
         const tocList = document.getElementById('toc-list')
         const bookTitle = document.getElementById('book-title')
-        const rendererSelect = document.getElementById('renderer-select')
         const layoutSelect = document.getElementById('layout-select')
         const spreadSelect = document.getElementById('spread-select')
         const fontSizeSelect = document.getElementById('font-size-select')
@@ -396,7 +433,6 @@
         function createDemoReader() {
             return createReader({
                 container: viewer,
-                renderer: rendererSelect.value,
                 layout: layoutSelect.value,
                 maxColumnCount: Number(spreadSelect.value),
                 parserOptions,
@@ -433,24 +469,35 @@
         }
 
         // Render TOC
-        const renderTOC = (items, container, depth = 0) => {
-            if (!items) return
+        const renderTOC = (items, container) => {
+            if (!items || items.length === 0) return
+            const ul = document.createElement('ul')
             for (const item of items) {
+                const li = document.createElement('li')
+                
                 const a = document.createElement('a')
                 a.className = 'toc-item'
-                a.style.paddingLeft = `${12 + depth * 16}px`
                 a.textContent = item.label
                 a.href = '#'
+                a.dataset.href = item.href
                 a.addEventListener('click', (e) => {
                     e.preventDefault()
                     reader.goTo(item.href)
                 })
-                a.dataset.href = item.href
-                container.appendChild(a)
-                if (item.subitems?.length) {
-                    renderTOC(item.subitems, container, depth + 1)
+
+                if (item.subitems && item.subitems.length > 0) {
+                    const details = document.createElement('details')
+                    const summary = document.createElement('summary')
+                    summary.appendChild(a)
+                    details.appendChild(summary)
+                    renderTOC(item.subitems, details)
+                    li.appendChild(details)
+                } else {
+                    li.appendChild(a)
                 }
+                ul.appendChild(li)
             }
+            container.appendChild(ul)
         }
 
         // Open a file
@@ -515,10 +562,6 @@
             reader.setLayout(e.target.value)
         })
 
-        rendererSelect.addEventListener('change', () => {
-            recreateReader()
-        })
-
         spreadSelect.addEventListener('change', (e) => {
             reader.setSpread(Number(e.target.value))
         })
@@ -560,7 +603,25 @@
                 progressText.textContent = `${percent}%`
 
                 // Highlight current TOC item
-                // (simplified - could be improved)
+                document.querySelectorAll('.toc-item.active').forEach(el => el.classList.remove('active'))
+                if (e.tocItem) {
+                    // Find the exact item matching the href
+                    const activeEls = Array.from(document.querySelectorAll('.toc-item')).filter(el => el.dataset.href === e.tocItem.href)
+                    const activeEl = activeEls[0]
+                    if (activeEl) {
+                        activeEl.classList.add('active')
+                        // Ensure all parent details are open
+                        let parent = activeEl.parentElement
+                        while (parent && parent.id !== 'toc-list') {
+                            if (parent.tagName === 'DETAILS') {
+                                parent.open = true
+                            }
+                            parent = parent.parentElement
+                        }
+                        // Optionally scroll into view in sidebar
+                        activeEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+                    }
+                }
             })
 
             reader.on('link', (e) => {

@@ -70,7 +70,7 @@ import { createReader } from 'rebook'
 
 const reader = createReader({
     container: document.getElementById('viewer')!,
-    renderer: 'virtual-text', // default; use 'iframe' for the legacy paginator
+    renderer: 'virtual-text', // default
     styles: {
         fontSize: '18px',
         lineHeight: 1.7,
@@ -79,7 +79,7 @@ const reader = createReader({
 })
 ```
 
-The default browser backend is `VirtualTextRenderer`: XHTML AST → structural blocks → preset styles → Pretext line ranges → visible DOM rows. Use `renderer: 'iframe'` when you need the legacy iframe/CSS paginator.
+The default browser backend is `VirtualTextRenderer`: XHTML AST → structural blocks → preset styles → Pretext line ranges → visible DOM rows.
 
 ### Opening
 
@@ -112,7 +112,7 @@ reader.setSpread(1) // Force single page
 
 #### Auto-Spread Layout
 
-In the default virtual text renderer, wide containers display two text columns side-by-side using the Pretext line list. The legacy iframe renderer uses its CSS-grid page window for the same `setSpread()` API.
+In the default virtual text renderer, wide containers display two text columns side-by-side using the Pretext line list.
 
 - **Container width ≥ 2 × `maxInlineSize` + `gap`**: Shows 2 pages (spread)
 - **Container width < 2 × `maxInlineSize` + `gap`**: Shows 1 page (single)
@@ -598,38 +598,6 @@ interface Renderer {
 ```
 
 ### Browser Renderer
-
-```typescript
-import { BrowserRenderer, createBrowserRenderer } from 'rebook'
-
-// Factory function (recommended)
-const renderer = createBrowserRenderer({
-    container: document.getElementById('viewer')!,
-    layout: 'paginated',
-    maxColumnCount: 2,  // Enable auto-spread (default: 2)
-})
-
-// Or class directly
-const renderer = new BrowserRenderer({
-    container: element,
-})
-
-// Control spread at runtime
-renderer.setSpread(2) // Auto-spread: 2 pages on wide screens
-renderer.setSpread(1) // Force single page
-```
-
-#### `setSpread(maxColumns)`
-
-Controls the maximum number of visible columns:
-
-- `1`: Always show single page
-- `2` (default): Auto-spread — show 2 pages when container width ≥ `2 × maxInlineSize + gap`
-- The renderer dynamically switches between 1 and 2 columns on resize
-
-In virtual-text spread mode, rows are flowed into left and right columns per viewport-height group, and only visible rows from both columns are mounted.
-
-### Virtual Text Renderer
 
 `VirtualTextRenderer` consumes `section.getBlocks()`, Pretext prepared blocks, and `LineRange[]` to render only the visible text rows as simple DOM spans. It supports auto-spread two-column layout through `maxColumnCount`, `maxInlineSize`, `gap`, and `setSpread()`.
 

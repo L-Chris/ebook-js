@@ -7,6 +7,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 // Config for running the demo locally
 export default defineConfig({
   root: 'demo',
+  base: process.env.NODE_ENV === 'production' ? '/rebook/' : '/',
   resolve: {
     alias: [
       { find: /^rebook\/parsers\/epub$/, replacement: resolve(__dirname, 'src/parsers/epub.ts') },

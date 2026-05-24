@@ -159,8 +159,6 @@ export { SectionProgress, TOCProgress } from './utils/progress'
 
 // Browser renderer
 export {
-    BrowserRenderer,
-    createBrowserRenderer,
     VirtualTextRenderer,
     createVirtualTextRenderer,
     ReaderView,

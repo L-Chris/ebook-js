@@ -45,9 +45,9 @@ Parsers have zero browser dependencies. DOM parsing, URL creation, and other pla
 
 ### 2. Renderers own the platform
 
-Platform-specific concerns (iframe management, paginated grid layout, DOM events, WXML, WebView) live entirely in renderers.
+Platform-specific concerns (paginated grid layout, DOM events, WXML, WebView) live entirely in renderers.
 
-**Why**: Different platforms render content differently. A browser uses iframes and CSS Grid to size the visible page window; WeChat uses `<rich-text>` with WXML; React Native uses WebView. None of these concerns belong in a parser.
+**Why**: Different platforms render content differently. A browser uses DOM/Canvas to size the visible page window; WeChat uses `<rich-text>` with WXML; React Native uses WebView. None of these concerns belong in a parser.
 
 ### 3. Book is the contract
 
@@ -60,15 +60,15 @@ Parsers produce a `Book`, renderers consume it. Neither knows about the other.
 `Section.load()` returns content strings, not blob URLs.
 
 **Why**: A URL is browser-specific. A string is universal. The renderer decides what to do with the string:
-- Browser: wrap in HTML document → blob URL → iframe
-- WeChat: convert to WXML → `<rich-text>` component
+- **WeChat Mini Program**: string → WXML `<rich-text>`
+- **Browser**: string/blocks → Pretext lines → DOM spans component
 - Node.js: extract text, generate static HTML
 
 ## Cross-Platform Rendering
 
 | Platform | Renderer | Content Pipeline |
 |----------|----------|------------------|
-| Web browser | `BrowserRenderer` | String → HTML document → blob URL → iframe |
+| Web browser | `VirtualTextRenderer` | AST blocks → Pretext lines → DOM spans |
 | Virtual text / Canvas | (custom) | XHTML AST → styled segments → `@chenglou/pretext` prepare/layout → visible line ranges |
 | WeChat Mini Program | (planned) | String → WXML → `<rich-text>` |
 | React Native | (planned) | String → WebView |
@@ -89,7 +89,7 @@ switch (section.format) {
 
 ## Browser Renderer Architecture
 
-`createReader()` defaults to `VirtualTextRenderer`. The legacy iframe paginator remains available through `createReader({ renderer: 'iframe' })` or direct `BrowserRenderer` usage.
+`createReader()` uses `VirtualTextRenderer` by default.
 
 ### Virtual Text Renderer
 
@@ -120,60 +120,9 @@ This avoids making the core `Section` interface depend on a concrete rendering a
 
 `ReaderView` owns renderer instances. Opening a new book destroys and recreates the renderer so stale DOM, scroll listeners, and pending async section loads cannot leak between books. `VirtualTextRenderer` also tags async section loads with an internal version so a destroyed or superseded load cannot write into the active renderer state.
 
-### Legacy Iframe Paginator
+### 2. Rendering
 
-The `BrowserRenderer` uses CSS Grid sizing around iframe content to achieve paginated reading.
-
-### Pagination Strategy
-
-Each section is loaded into an iframe whose visible page window is sized as a grid:
-
-```typescript
-const visibleWidth = pageWidth * columns + gap * (columns - 1)
-
-iframe.style.width = `${visibleWidth}px`
-iframe.style.margin = '0 auto'
-wrapper.style.display = 'grid'
-wrapper.style.gridTemplateColumns = '1fr'
-wrapper.style.placeItems = 'stretch center'
-```
-
-The grid keeps the active page window centered and gives it an exact width. Navigation still advances by the visible grid span: `pageWidth` for a single page, or `pageWidth * 2 + gap` for a two-page spread.
-
-### Auto-Spread Layout
-
-The renderer dynamically switches the grid span between single-page and two-page spread layouts based on container width:
-
-```typescript
-const columns = Math.min(
-    maxColumnCount,  // default: 2
-    Math.max(1, Math.ceil(availableWidth / maxInlineSize)),
-)
-
-const pageWidth = (availableWidth - gap * (columns - 1)) / columns
-const visibleWidth = pageWidth * columns + gap * (columns - 1)
-```
-
-**Single-page mode** (narrow containers):
-- Grid span width = `pageWidth`
-- One page slot visible at a time
-
-**Spread mode** (wide containers, `columns = 2`):
-- Grid span width = `pageWidth * 2 + gap`
-- Two page slots visible side-by-side
-- Navigation scrolls by the full visible width
-
-The `maxColumnCount` config option (default: `2`) controls the maximum number of visible pages. Set to `1` to always use single-page layout.
-
-### Key Implementation Details
-
-1. **Grid sizing owns the visible span**: The renderer computes `pageWidth`, `gap`, and `columns`, then sizes the iframe to the exact grid span so single-page and spread modes share the same navigation model.
-
-2. **XML declaration detection**: EPUB sections serialized by `XMLSerializer` start with `<?xml version="1.0"?>`. The renderer detects this and serves as `text/html` (lenient parsing) rather than `application/xhtml+xml` (strict XML).
-
-3. **Resource replacement**: Embedded resources (images, CSS, fonts) are converted to blob URLs during section loading, replacing relative paths in the content string.
-
-4. **Resize handling**: `ResizeObserver` monitors the container and recalculates layout, potentially switching between single-page and spread modes.
+The `VirtualTextRenderer` receives Pretext layout lines and renders only the visible subset to the DOM.
 
 ## Adapter System
 
@@ -229,7 +178,7 @@ rebook does not implement the text measurement or Unicode line-breaking engine. 
 - maps Pretext line fragments back to the source EPUB segment index and style
 - computes visible line windows for virtualized renderers
 
-The iframe `BrowserRenderer` remains compatible as an explicit fallback for fixed-layout, image-heavy, or EPUB-CSS-sensitive books.
+These capabilities are decoupled from the parser. The parser only guarantees that `book.sections` exists and can produce `getDocument()` and `getBlocks()`.
 
 ### URLFactory responsibilities
 
