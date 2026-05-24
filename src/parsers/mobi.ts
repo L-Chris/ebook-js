@@ -848,6 +848,20 @@ class MOBI {
 const mbpPagebreakRegex = /<\s*(?:mbp:)?pagebreak[^>]*>/gi
 const fileposRegex = /<[^<>]+filepos=['"]{0,1}(\d+)[^<>]*>/gi
 const selfClosingRegex = /<(a|div|span|p)\s*\/>/gi
+const htmlVoidTagRegex = /<(area|base|br|col|embed|hr|img|input|link|meta|param|source|track|wbr)\b([^<>]*?)>/gi
+
+function sanitizeMOBI6HTML(str: string): string {
+    return str
+        .replace(/\s(filepos|recindex)=["']?(\d+)["']?/gi, ' $1="$2"')
+        .replace(selfClosingRegex, '<$1></$1>')
+        .replace(htmlVoidTagRegex, (match, tag: string, attrs: string) =>
+            /\/\s*>$/.test(match) ? match : `<${tag}${attrs}/>`)
+        .replace(/<\/(area|base|br|col|embed|hr|img|input|link|meta|param|source|track|wbr)>/gi, '')
+}
+
+function wrapMOBI6Fragment(str: string): string {
+    return `<!DOCTYPE html><html><head><meta charset="utf-8"/></head><body>${str}</body></html>`
+}
 
 interface MOBI6Section {
     book: MOBI6
@@ -945,7 +959,7 @@ class MOBI6 {
                 const docStr = await this.sections[index].createDocument!() as string
                 // Parse the document to extract TOC links
                 if (this.#domAdapter) {
-                    const doc = this.#domAdapter.parseHTML(docStr, MIME_HTML)
+                    const doc = this.#domAdapter.parseHTML(wrapMOBI6Fragment(docStr), MIME_HTML)
                     const links = doc.querySelectorAll('a[filepos]')
                     this.toc = []
                     for (const a of links) {
@@ -976,7 +990,7 @@ class MOBI6 {
     async getGuide(): Promise<Landmark[]> {
         const docStr = await this.createDocument(this.#sections[0])
         if (!this.#domAdapter) return []
-        const doc = this.#domAdapter.parseHTML(docStr, MIME_HTML)
+        const doc = this.#domAdapter.parseHTML(wrapMOBI6Fragment(docStr), MIME_HTML)
         const refs = doc.getElementsByTagName('reference')
         return refs.map(ref => ({
             label: ref.getAttribute('title') || '',
@@ -1004,7 +1018,7 @@ class MOBI6 {
             return match
         })
         // For simplicity, use regex-based async replacement
-        const imgRegex = /recindex=["'](\d+)["']/gi
+        const imgRegex = /recindex=["']?(\d+)["']?/gi
         const matches: { full: string; recindex: string }[] = []
         let m: RegExpExecArray | null
         while ((m = imgRegex.exec(htmlStr)) !== null) {
@@ -1020,8 +1034,8 @@ class MOBI6 {
         }
 
         // Replace filepos links
-        htmlStr = htmlStr.replace(/filepos=["']{0,1}(\d+)/gi, (_, filepos) =>
-            `href="filepos:${filepos}"`)
+        htmlStr = htmlStr.replace(/\sfilepos=["']?(\d+)["']?/gi, (_, filepos) =>
+            ` href="filepos:${filepos}"`)
 
         return htmlStr
     }
@@ -1045,15 +1059,16 @@ class MOBI6 {
             })
         }
 
-        const str = this.#mobi.decode(arr).replaceAll(mbpPagebreakRegex, '')
+        const str = this.#mobi.decode(arr)
+            .replaceAll(mbpPagebreakRegex, '')
+            .replace(/<\/\s*(?:mbp:)?pagebreak\s*>/gi, '')
         this.#textCache.set(section, str)
         return str
     }
 
     async createDocument(section: MOBI6Section): Promise<string> {
         const str = await this.loadSectionText(section)
-        // Sanitize self-closing tags
-        return str.replace(selfClosingRegex, '<$1></$1>')
+        return sanitizeMOBI6HTML(str)
     }
 
     async loadSection(section: MOBI6Section): Promise<string> {
@@ -1526,10 +1541,7 @@ class KF8 {
         if (!pos) return null
         const index = this.getIndexByFID(pos.fid)
         if (index < 0) return null
-        const saved = this.#fragmentSelectors.get(pos.fid)?.get(pos.off)
-        const anchor = saved
-            ? () => saved
-            : () => null
+        const anchor = () => this.#fragmentSelectors.get(pos.fid)?.get(pos.off) ?? null
         return { index, anchor }
     }
 

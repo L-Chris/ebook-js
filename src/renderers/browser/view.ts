@@ -163,7 +163,7 @@ export class ReaderView {
      */
     getLocation(): RelocateEvent | null {
         const location = this.renderer.getLocation()
-        if (location && !location.tocItem) {
+        if (location && location.tocItem === undefined) {
             location.tocItem = this.getCurrentTOCItem(location)
         }
         return location
@@ -176,6 +176,7 @@ export class ReaderView {
         if (!this.book || !this.book.toc) return null
         const loc = location ?? this.getLocation()
         if (!loc) return null
+        if (loc.tocItem !== undefined) return loc.tocItem
 
         let activeItem: TOCItem | null = null
         let maxIndex = -1
@@ -242,7 +243,7 @@ export class ReaderView {
         let wrappedListener = listener
         if (event === 'relocate') {
             wrappedListener = (e: RelocateEvent) => {
-                if (!e.tocItem) e.tocItem = this.getCurrentTOCItem(e)
+                if (e.tocItem === undefined) e.tocItem = this.getCurrentTOCItem(e)
                 listener(e)
             }
         }

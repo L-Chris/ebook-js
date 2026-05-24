@@ -4,7 +4,7 @@
  * This renderer keeps the DOM small by rendering only visible line ranges.
  */
 
-import type { Book, LinkEvent, LoadEvent, RelocateEvent, ResolvedNavigation, Section } from '../../core/types'
+import type { Book, LinkEvent, LoadEvent, RelocateEvent, ResolvedNavigation, Section, TOCItem } from '../../core/types'
 import type { LayoutMode, Renderer, RendererConfig, RendererStyles } from '../../core/renderer'
 import { SectionProgress } from '../../utils/progress'
 import {
@@ -41,6 +41,13 @@ interface ColumnLayout {
     pagePaddingBlock: number
     totalHeight: number
     pageCount: number
+}
+
+interface TOCPosition {
+    index: number
+    sourceTop: number
+    order: number
+    item: TOCItem
 }
 
 const debounce = <T extends (...args: unknown[]) => void>(fn: T, wait: number): T => {
@@ -81,6 +88,9 @@ export class VirtualTextRenderer implements Renderer {
     private listeners = new Map<string, Set<Listener<unknown>>>()
     private resizeObserver: ResizeObserver
     private activeLoadId = 0
+    private tocPositions: TOCPosition[] = []
+    private pendingTOCItem: TOCItem | null = null
+    private suppressNextScrollRelocate = false
 
     constructor(config: RendererConfig) {
         this.container = config.container
@@ -111,6 +121,10 @@ export class VirtualTextRenderer implements Renderer {
 
         this.scroller.addEventListener('scroll', () => {
             this.renderVisibleLines()
+            if (this.suppressNextScrollRelocate) {
+                this.suppressNextScrollRelocate = false
+                return
+            }
             this.emitRelocate('scroll')
         }, { passive: true })
         this.scroller.addEventListener('wheel', (event) => {
@@ -133,16 +147,23 @@ export class VirtualTextRenderer implements Renderer {
         this.book = book
         this.sections = book.sections
         this.progress = new SectionProgress(this.sections)
+        this.tocPositions = []
     }
 
     async goTo(target: number | string): Promise<void> {
         if (typeof target === 'number') {
+            this.pendingTOCItem = null
             await this.loadSection(target)
             return
         }
 
         const resolved = this.book?.resolveHref?.(target) ?? this.resolveHrefFallback(target)
-        if (resolved) await this.loadSection(resolved.index, resolved.anchor)
+        if (resolved) {
+            this.pendingTOCItem = this.findTOCItem(target)
+            await this.loadSection(resolved.index, resolved.anchor)
+        } else {
+            this.pendingTOCItem = null
+        }
     }
 
     async next(): Promise<void> {
@@ -206,6 +227,7 @@ export class VirtualTextRenderer implements Renderer {
             return
         }
         const maxScroll = Math.max(0, this.scroller.scrollHeight - this.scroller.clientHeight)
+        this.suppressNextScrollRelocate = true
         this.scroller.scrollTop = maxScroll * sectionFraction
         this.renderVisibleLines()
         this.emitRelocate('fraction')
@@ -289,15 +311,16 @@ export class VirtualTextRenderer implements Renderer {
             : 0
         this.relayout()
 
+        const anchorScrollTop = this.getAnchorScrollTop(anchor)
+        const targetScrollTop = anchorScrollTop ?? restoreScrollTop
         if (this.layoutMode === 'paginated') {
-            this.pageIndex = typeof anchor === 'number'
-                ? Math.max(0, Math.floor(anchor / Math.max(1, this.columnLayout.pageHeight)))
-                : Math.min(this.pageIndex, this.columnLayout.pageCount - 1)
+            this.pageIndex = Math.max(0, Math.floor(targetScrollTop / Math.max(1, this.columnLayout.pageHeight)))
+            this.pageIndex = Math.min(this.pageIndex, this.columnLayout.pageCount - 1)
+            this.suppressNextScrollRelocate = true
             this.scroller.scrollTop = this.pageIndex * this.columnLayout.pageHeight
         } else {
-            this.scroller.scrollTop = typeof anchor === 'number'
-                ? anchor
-                : restoreScrollTop
+            this.suppressNextScrollRelocate = true
+            this.scroller.scrollTop = targetScrollTop
         }
 
         this.renderVisibleLines()
@@ -375,6 +398,7 @@ export class VirtualTextRenderer implements Renderer {
         this.content.style.left = `${contentLeft}px`
         this.content.style.right = 'auto'
         this.content.style.width = `${contentWidth}px`
+        this.rebuildTOCPositions()
         this.renderVisibleLines()
     }
 
@@ -463,20 +487,23 @@ export class VirtualTextRenderer implements Renderer {
         const fraction = this.layoutMode === 'paginated'
             ? this.columnLayout.pageCount > 1 ? this.pageIndex / (this.columnLayout.pageCount - 1) : 0
             : maxScroll > 0 ? this.scroller.scrollTop / maxScroll : 0
+        const range = getVisibleLines(
+            this.lines,
+            this.getSourceScrollTop(),
+            this.getSourceViewportHeight(),
+            0,
+        )
         const event: RelocateEvent = {
-            range: getVisibleLines(
-                this.lines,
-                this.getSourceScrollTop(),
-                this.getSourceViewportHeight(),
-                0,
-            ),
+            range,
             index: this.currentIndex,
             fraction,
             totalFraction: this.progress?.getProgress(this.currentIndex, fraction).fraction,
+            tocItem: this.pendingTOCItem ?? this.getCurrentTOCItem(),
             reason,
         }
         this.lastLocation = event
         this.emit('relocate', event)
+        this.pendingTOCItem = null
     }
 
     private resolveHrefFallback(href: string): ResolvedNavigation | null {
@@ -484,6 +511,132 @@ export class VirtualTextRenderer implements Renderer {
         const index = this.sections.findIndex(section =>
             typeof section.id === 'string' && (section.id === path || section.id.endsWith(path)))
         return index < 0 ? null : { index }
+    }
+
+    private rebuildTOCPositions(): void {
+        this.tocPositions = []
+        if (!this.book?.toc) return
+
+        for (const [order, item] of flattenTOC(this.book.toc).entries()) {
+            const resolved = this.book.resolveHref?.(item.href)
+            const index = resolved?.index ?? this.getTOCSectionIndex(item.href)
+            if (index == null || index < 0) continue
+            let sourceTop = 0
+            if (index === this.currentIndex) {
+                const anchorTop = this.getAnchorSourceTop(resolved?.anchor)
+                if (anchorTop == null) continue
+                sourceTop = anchorTop
+            }
+            this.tocPositions.push({ index, sourceTop, order, item })
+        }
+        this.tocPositions.sort(compareTOCPosition)
+    }
+
+    private getTOCSectionIndex(href: string): number | null {
+        const result = this.book?.splitTOCHref?.(href)
+        if (!result) return null
+        const [id] = result
+        const index = this.sections.findIndex(section => section.id === id)
+        return index >= 0 ? index : null
+    }
+
+    private findTOCItem(href: string): TOCItem | null {
+        if (!this.book?.toc) return null
+        return flattenTOC(this.book.toc).find(item => item.href === href) ?? null
+    }
+
+    private getCurrentTOCItem(): TOCItem | null {
+        if (!this.tocPositions.length || this.currentIndex < 0) return null
+        const sourceStart = this.getSourceScrollTop()
+        const sourceEnd = sourceStart + this.getSourceViewportHeight()
+        if (this.layoutMode === 'paginated') {
+            const visible = this.tocPositions.find(position =>
+                position.index === this.currentIndex
+                && position.sourceTop > sourceStart + 1
+                && position.sourceTop < sourceEnd - 1)
+            if (visible) return visible.item
+        }
+
+        const sourceTop = sourceStart + this.getLineHeightPixels() * 0.5
+        let active: TOCPosition | null = null
+
+        for (const position of this.tocPositions) {
+            if (position.index > this.currentIndex) break
+            if (position.index === this.currentIndex && position.sourceTop > sourceTop) break
+            active = position
+        }
+
+        return active?.item ?? null
+    }
+
+    private getAnchorScrollTop(anchor?: ResolvedNavigation['anchor']): number | null {
+        if (anchor == null) return null
+        if (typeof anchor === 'number') return anchor
+
+        const sourceTop = this.getAnchorSourceTop(anchor)
+        return sourceTop == null ? null : this.getScrollTopForSourceTop(sourceTop)
+    }
+
+    private getAnchorSourceTop(anchor?: ResolvedNavigation['anchor']): number | null {
+        if (anchor == null) return null
+        if (typeof anchor === 'number') return anchor
+
+        const value = this.resolveAnchorValue(anchor)
+        if (typeof value === 'number') return value
+
+        const anchorIds = getAnchorIds(value)
+        if (!anchorIds.length) return null
+
+        const line = this.lines.find(item => {
+            const block = item.block
+            if (!block) return false
+            return anchorIds.some(id =>
+                block.id === id
+                || block.attrs?.id === id
+                || block.attrs?.name === id)
+        })
+
+        return line?.top ?? this.getFileposSourceTop(anchorIds)
+    }
+
+    private getFileposSourceTop(anchorIds: readonly string[]): number | null {
+        const id = anchorIds.find(value => /^filepos\d+$/.test(value))
+        if (!id || this.currentIndex < 0) return null
+
+        const filepos = Number(id.slice('filepos'.length))
+        const sectionStart = this.sections
+            .slice(0, this.currentIndex)
+            .reduce((sum, section) => sum + Math.max(0, section.size ?? 0), 0)
+        const sectionSize = Math.max(1, this.sections[this.currentIndex]?.size ?? 1)
+        const fraction = Math.max(0, Math.min(1, (filepos - sectionStart) / sectionSize))
+        return fraction * this.getContentHeight()
+    }
+
+    private getContentHeight(): number {
+        const last = this.lines[this.lines.length - 1]
+        return last ? last.top + last.height : 0
+    }
+
+    private resolveAnchorValue(anchor: ResolvedNavigation['anchor']): unknown {
+        if (typeof anchor !== 'function') return anchor
+        try {
+            return anchor({
+                getElementById: (id: string) => id,
+                querySelector: (selector: string) => selector,
+            })
+        } catch {
+            return null
+        }
+    }
+
+    private getScrollTopForSourceTop(sourceTop: number): number {
+        const safeSourceTop = Math.max(0, sourceTop)
+        if (this.layoutMode === 'paginated') {
+            const pageSourceHeight = Math.max(1, this.columnLayout.columnHeight * this.columnLayout.columns)
+            const page = Math.floor(safeSourceTop / pageSourceHeight)
+            return page * this.columnLayout.pageHeight
+        }
+        return safeSourceTop + this.columnLayout.pagePaddingBlock
     }
 
     private getBaseTextStyle(): TextStyle {
@@ -529,6 +682,7 @@ export class VirtualTextRenderer implements Renderer {
     private applyPageScroll(reason: string): void {
         if (this.layoutMode === 'paginated') {
             this.pageIndex = Math.min(Math.max(0, this.pageIndex), this.columnLayout.pageCount - 1)
+            this.suppressNextScrollRelocate = true
             this.scroller.scrollTop = this.pageIndex * this.columnLayout.pageHeight
         }
         this.renderVisibleLines()
@@ -561,8 +715,10 @@ export class VirtualTextRenderer implements Renderer {
                 this.columnLayout.pageCount - 1,
                 Math.round(safe * Math.max(0, this.columnLayout.pageCount - 1)),
             )
+            this.suppressNextScrollRelocate = true
             this.scroller.scrollTop = this.pageIndex * this.columnLayout.pageHeight
         } else {
+            this.suppressNextScrollRelocate = true
             this.scroller.scrollTop = this.scrollTopForFraction(safe)
         }
         this.renderVisibleLines()
@@ -594,6 +750,49 @@ export class VirtualTextRenderer implements Renderer {
 
 export const createVirtualTextRenderer = (config: RendererConfig): Renderer => {
     return new VirtualTextRenderer(config)
+}
+
+function flattenTOC(items: readonly TOCItem[]): TOCItem[] {
+    return items.flatMap(item =>
+        item.subitems?.length
+            ? [item, ...flattenTOC(item.subitems)]
+            : [item]
+    )
+}
+
+function compareTOCPosition(a: TOCPosition, b: TOCPosition): number {
+    return a.index - b.index
+        || a.sourceTop - b.sourceTop
+        || a.order - b.order
+}
+
+function getAnchorIds(value: unknown): string[] {
+    if (typeof value !== 'string') {
+        const id = getElementLikeId(value)
+        return id ? [id] : []
+    }
+
+    const trimmed = value.trim()
+    if (!trimmed) return []
+
+    const attrMatch = trimmed.match(/^\[(?:id|name)=["']([^"']+)["']\]$/)
+    if (attrMatch) return [unescapeCSSIdentifier(attrMatch[1])]
+
+    if (trimmed.startsWith('#')) return [unescapeCSSIdentifier(trimmed.slice(1))]
+    if (/^[\w:-]+$/.test(trimmed)) return [trimmed]
+
+    return []
+}
+
+function getElementLikeId(value: unknown): string | null {
+    if (!value || typeof value !== 'object') return null
+    const maybeElement = value as { id?: unknown; getAttribute?: (name: string) => string | null }
+    if (typeof maybeElement.id === 'string' && maybeElement.id) return maybeElement.id
+    return maybeElement.getAttribute?.('id') ?? maybeElement.getAttribute?.('name') ?? null
+}
+
+function unescapeCSSIdentifier(value: string): string {
+    return value.replace(/\\(.)/g, '$1')
 }
 
 function applyTextStyle(element: HTMLElement, style: TextStyle): void {

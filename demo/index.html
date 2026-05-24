@@ -428,6 +428,7 @@
         const progressText = document.getElementById('progress-text')
 
         let currentFile = null
+        let activeTOCHref = null
         let reader = createDemoReader()
 
         function createDemoReader() {
@@ -519,6 +520,7 @@
                 }
 
                 const book = await reader.open(file)
+                activeTOCHref = null
 
                 // Update UI
                 const title = formatLanguageMap(book.metadata?.title) || 'Untitled'
@@ -603,6 +605,11 @@
                 progressText.textContent = `${percent}%`
 
                 // Highlight current TOC item
+                const href = e.tocItem?.href ?? null
+                if (href === activeTOCHref) return
+                if (!href) return
+                activeTOCHref = href
+
                 document.querySelectorAll('.toc-item.active').forEach(el => el.classList.remove('active'))
                 if (e.tocItem) {
                     // Find the exact item matching the href
