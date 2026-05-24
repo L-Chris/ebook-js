@@ -40,7 +40,7 @@ export class EPUBExporter implements Exporter {
     readonly extension = '.epub'
 
     canExport(_book: Book, selection: ExportSelection): boolean {
-        return selection.type === 'first-pages' && (!selection.unit || selection.unit === 'section')
+        return selection.type === 'first-sections' && (!selection.unit || selection.unit === 'section')
     }
 
     async exportBook(book: Book, selection: ExportSelection, options: ExportOptions = {}): Promise<Blob> {
@@ -507,11 +507,11 @@ function renderNavItems(items: readonly ExportNavItem[], depth: number): string 
 
 function buildExportTitle(metadata: BookMetadata | undefined): string {
     const title = stringifyLanguageMap(metadata?.title)
-    return title ? `${title} - First Pages` : 'First Pages'
+    return title ? `${title} - First Sections` : 'First Sections'
 }
 
 function buildIdentifier(metadata: BookMetadata | undefined): string {
-    return `${metadata?.identifier ?? 'rebook-export'}-first-pages-${Date.now()}`
+    return `${metadata?.identifier ?? 'rebook-export'}-first-sections-${Date.now()}`
 }
 
 function stringifyLanguageMap(value: LanguageMap | undefined): string {

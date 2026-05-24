@@ -12,10 +12,10 @@ import {
     exportBook,
     exportBookAsBuffer,
     exporterRegistry,
-    exportFirstPages,
-    exportFirstPagesAsBuffer,
+    exportFirstSections,
+    exportFirstSectionsAsBuffer,
     fb2,
-    firstPagesSelection,
+    firstSectionsSelection,
     mobi,
     registry,
     createZipLoader,
@@ -38,7 +38,7 @@ const tinyPNG = new Uint8Array([
     0x44, 0xAE, 0x42, 0x60, 0x82,
 ])
 
-describe('EPUB first-pages exporter', () => {
+describe('EPUB first-sections exporter', () => {
     beforeEach(() => {
         registry.unregister('epub')
         registry.unregister('cbz')
@@ -53,7 +53,7 @@ describe('EPUB first-pages exporter', () => {
             format: 'test-format',
             mediaType: 'text/plain',
             extension: '.txt',
-            canExport: (_book, selection) => selection.type === 'first-pages',
+            canExport: (_book, selection) => selection.type === 'first-sections',
             exportBook: async (_book, selection) => {
                 calls.push(`${selection.type}:${selection.count}`)
                 return new Blob([`format=${selection.type};count=${selection.count}`], { type: 'text/plain' })
@@ -61,12 +61,12 @@ describe('EPUB first-pages exporter', () => {
         }
 
         exporterRegistry.register('test-format', () => testExporter)
-        const blob = await exportBook(book, firstPagesSelection(2), { format: 'test-format' })
+        const blob = await exportBook(book, firstSectionsSelection(2), { format: 'test-format' })
 
         expect(exporterRegistry.list()).toContain('test-format')
         expect(exporterRegistry.get('test-format')?.extension).toBe('.txt')
-        expect(await blob.text()).toBe('format=first-pages;count=2')
-        expect(calls).toEqual(['first-pages:2'])
+        expect(await blob.text()).toBe('format=first-sections;count=2')
+        expect(calls).toEqual(['first-sections:2'])
     })
 
     it('exports the first N reflowable sections as a new EPUB', async () => {
@@ -80,7 +80,7 @@ describe('EPUB first-pages exporter', () => {
         })
         const book = await epub().parse(input, parserOptions)
 
-        const exported = await exportBook(book, firstPagesSelection(2), { format: 'epub' })
+        const exported = await exportBook(book, firstSectionsSelection(2), { format: 'epub' })
         const parsed = await epub().parse(await exported.arrayBuffer(), parserOptions)
 
         expect(parsed.sections).toHaveLength(2)
@@ -111,7 +111,7 @@ describe('EPUB first-pages exporter', () => {
             ],
         }
 
-        const exported = await exportFirstPages(book, 2, { format: 'epub' })
+        const exported = await exportFirstSections(book, 2, { format: 'epub' })
         const parsed = await epub().parse(await exported.arrayBuffer(), parserOptions)
 
         expect(parsed.toc?.map(item => item.label)).toEqual(['Introduction', 'Main Chapter'])
@@ -154,7 +154,7 @@ describe('EPUB first-pages exporter', () => {
             },
         }
 
-        const exported = await exportFirstPages(book, 2, { format: 'epub' })
+        const exported = await exportFirstSections(book, 2, { format: 'epub' })
         const parsed = await epub().parse(await exported.arrayBuffer(), parserOptions)
 
         expect(parsed.toc?.map(item => item.label)).toEqual(['Original Intro', 'Original Chapter'])
@@ -177,7 +177,7 @@ describe('EPUB first-pages exporter', () => {
             ],
         })
 
-        const exported = await exportFirstPages(input, 1, { parserOptions })
+        const exported = await exportFirstSections(input, 1, { parserOptions })
         const loader = await createZipLoader(await exported.arrayBuffer())
         const chapter = await loader.loadText('OEBPS/text/page-1.xhtml')
         const image = await loader.loadBlob('OEBPS/images/resource-1.png')
@@ -208,18 +208,18 @@ describe('EPUB first-pages exporter', () => {
             ],
         })
 
-        const exported = await exportFirstPages(input, 1, { parserOptions })
+        const exported = await exportFirstSections(input, 1, { parserOptions })
         const parsed = await epub().parse(await exported.arrayBuffer(), parserOptions)
 
         expect(parsed.sections).toHaveLength(1)
         expect(await parsed.sections[0].loadText?.()).toContain('Keep me.')
     })
 
-    it('exports the first N CBZ image pages as EPUB pages', async () => {
+    it('exports the first N CBZ image sections as EPUB sections', async () => {
         const input = await createTestCBZ({ title: 'Comic', pages: 3 })
         const book = await cbz().parse(input, parserOptions)
 
-        const exported = await exportBook(book, firstPagesSelection(2), { format: 'epub' })
+        const exported = await exportBook(book, firstSectionsSelection(2), { format: 'epub' })
         const parsed = await epub().parse(await exported.arrayBuffer(), parserOptions)
 
         expect(parsed.sections).toHaveLength(2)
@@ -227,7 +227,7 @@ describe('EPUB first-pages exporter', () => {
         expect(await parsed.sections[0].loadText?.()).toContain('img')
     })
 
-    it('exports the first N FB2 sections as EPUB pages', async () => {
+    it('exports the first N FB2 sections as EPUB sections', async () => {
         const input = createTestFB2Buffer({
             sections: [
                 { title: 'One', paragraphs: ['FB2 first.'] },
@@ -237,7 +237,7 @@ describe('EPUB first-pages exporter', () => {
         })
         const book = await fb2().parse(input, parserOptions)
 
-        const exported = await exportBook(book, firstPagesSelection(2), { format: 'epub' })
+        const exported = await exportBook(book, firstSectionsSelection(2), { format: 'epub' })
         const parsed = await epub().parse(await exported.arrayBuffer(), parserOptions)
         const exportedTexts = await Promise.all(parsed.sections.map(section => section.loadText?.() ?? ''))
 
@@ -247,7 +247,7 @@ describe('EPUB first-pages exporter', () => {
         expect(exportedTexts.join('\n')).not.toContain('FB2 third.')
     })
 
-    it('exports the first N MOBI sections as EPUB pages', async () => {
+    it('exports the first N MOBI sections as EPUB sections', async () => {
         const input = createTestMOBI({
             sections: [
                 { html: '<html><body><h1>One</h1><p>MOBI first.</p></body></html>' },
@@ -256,7 +256,7 @@ describe('EPUB first-pages exporter', () => {
         })
         const book = await mobi().parse(input, parserOptions)
 
-        const exported = await exportFirstPages(book, 1, { format: 'epub' })
+        const exported = await exportFirstSections(book, 1, { format: 'epub' })
         const parsed = await epub().parse(await exported.arrayBuffer(), parserOptions)
 
         expect(parsed.sections).toHaveLength(1)
@@ -269,7 +269,7 @@ describe('EPUB first-pages exporter', () => {
         for (const filename of ['data/1.mobi', 'data/1.azw3']) {
             const data = await readFile(filename)
             const source = await mobi().parse(data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength), parserOptions)
-            const exported = await exportFirstPages(source, 3, { format: 'epub', parserOptions })
+            const exported = await exportFirstSections(source, 3, { format: 'epub', parserOptions })
             const loader = await createZipLoader(await exported.arrayBuffer())
             const imageEntries = loader.entries.filter(entry => entry.filename.startsWith('OEBPS/images/'))
             const parsed = await epub().parse(await exported.arrayBuffer(), parserOptions)
@@ -285,11 +285,11 @@ describe('EPUB first-pages exporter', () => {
         }
     })
 
-    it('rejects invalid page counts', async () => {
+    it('rejects invalid section counts', async () => {
         const input = await createTestEPUB()
         const book = await epub().parse(input, parserOptions)
 
-        await expect(exportBook(book, firstPagesSelection(0), { format: 'epub' })).rejects.toThrow('pageCount')
+        await expect(exportBook(book, firstSectionsSelection(0), { format: 'epub' })).rejects.toThrow('sectionCount')
     })
 
     it('exports through generic buffer helpers', async () => {
@@ -301,8 +301,8 @@ describe('EPUB first-pages exporter', () => {
         })
         const book = await epub().parse(input, parserOptions)
 
-        const viaBook = await exportBookAsBuffer(book, firstPagesSelection(1), { format: 'epub' })
-        const viaSource = await exportFirstPagesAsBuffer(book, 1, { format: 'epub' })
+        const viaBook = await exportBookAsBuffer(book, firstSectionsSelection(1), { format: 'epub' })
+        const viaSource = await exportFirstSectionsAsBuffer(book, 1, { format: 'epub' })
 
         expect(viaBook.byteLength).toBeGreaterThan(0)
         expect(viaSource.byteLength).toBeGreaterThan(0)

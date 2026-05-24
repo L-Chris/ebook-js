@@ -65,18 +65,18 @@ await reader.next()
 await reader.goTo('/path/to/chapter.xhtml#section')
 ```
 
-### 导出前 N 页
+### 导出前 N 个 section
 
 ```typescript
-import { exportFirstPages } from 'rebook'
+import { exportFirstSections } from 'rebook'
 
-const blob = await exportFirstPages(file, 5, {
+const blob = await exportFirstSections(file, 5, {
     format: 'epub',
     parserOptions: { domAdapter, urlFactory },
 })
 ```
 
-导出格式通过 `exporterRegistry` 注册，后续新增输出格式不需要改解析器或渲染器。当前可移植的页单位是线性阅读 section：CBZ 对应图片页，EPUB/MOBI/FB2 对应 spine 或解析器切出的阅读段，不是排版后的视觉页。
+导出格式通过 `exporterRegistry` 注册，后续新增输出格式不需要改解析器或渲染器。按数量导出使用线性阅读 section：CBZ 的 section 对应图片页，EPUB/MOBI/FB2 对应 spine 或解析器切出的阅读段，不是排版后的视觉页。
 
 ### 浏览器渲染
 

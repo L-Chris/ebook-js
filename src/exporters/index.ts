@@ -7,9 +7,9 @@ export {
     exportBook,
     exportBookAsBuffer,
     exporterRegistry,
-    exportFirstPages,
-    exportFirstPagesAsBuffer,
-    firstPagesSelection,
+    exportFirstSections,
+    exportFirstSectionsAsBuffer,
+    firstSectionsSelection,
 } from '../core/exporter'
 export {
     EPUBExporter,
@@ -19,9 +19,9 @@ export type {
     Exporter,
     ExporterFactory,
     ExportOptions,
-    ExportFirstPagesOptions,
+    ExportFirstSectionsOptions,
     ExportFormat,
-    ExportPageUnit,
+    ExportSectionUnit,
     ExportSelection,
     ExportSelectionType,
 } from '../core/exporter'

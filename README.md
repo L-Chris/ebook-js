@@ -65,18 +65,18 @@ await reader.next()
 await reader.goTo('/path/to/chapter.xhtml#section')
 ```
 
-### Export First Pages
+### Export First Sections
 
 ```typescript
-import { exportFirstPages } from 'rebook'
+import { exportFirstSections } from 'rebook'
 
-const blob = await exportFirstPages(file, 5, {
+const blob = await exportFirstSections(file, 5, {
     format: 'epub',
     parserOptions: { domAdapter, urlFactory },
 })
 ```
 
-Exporters are registered through `exporterRegistry`, so future output formats can be added without changing parser or renderer code. The current portable page unit is a linear reading section: CBZ maps this to image pages, while EPUB/MOBI/FB2 map it to spine or parser-split sections rather than visual pages after layout.
+Exporters are registered through `exporterRegistry`, so future output formats can be added without changing parser or renderer code. Exporting by count uses linear reading sections: CBZ maps sections to image pages, while EPUB/MOBI/FB2 map them to spine or parser-split sections rather than visual pages after layout.
 
 ### Browser Rendering
 

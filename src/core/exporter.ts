@@ -11,14 +11,14 @@ import type { Parser, ParserInput, ParserOptions } from './parser'
 import { registry as parserRegistry } from './parser'
 import { UnsupportedFormatError } from './errors'
 
-export type ExportPageUnit = 'section'
-export type ExportSelectionType = 'first-pages'
+export type ExportSectionUnit = 'section'
+export type ExportSelectionType = 'first-sections'
 export type ExportFormat = string
 
 export interface ExportSelection {
     readonly type: ExportSelectionType
     readonly count: number
-    readonly unit?: ExportPageUnit
+    readonly unit?: ExportSectionUnit
     readonly includeNonLinear?: boolean
 }
 
@@ -37,14 +37,14 @@ export interface ExportOptions {
     identifier?: string
 }
 
-export interface ExportFirstPagesOptions extends ExportOptions {
+export interface ExportFirstSectionsOptions extends ExportOptions {
     /**
-     * Page unit used for extraction.
+     * Unit used for extraction.
      * Currently only "section" is portable across parsers. For CBZ this is one
      * image page; for reflowable formats this is one spine/reading section, not
      * a renderer-layout visual page.
      */
-    unit?: ExportPageUnit
+    unit?: ExportSectionUnit
     /** Include non-linear sections such as notes. Defaults to false. */
     includeNonLinear?: boolean
 }
@@ -118,27 +118,27 @@ export async function exportBookAsBuffer(
     return blob.arrayBuffer()
 }
 
-export async function exportFirstPages(
+export async function exportFirstSections(
     source: Book | ParserInput,
-    pageCount: number,
-    options: ExportFirstPagesOptions = {},
+    sectionCount: number,
+    options: ExportFirstSectionsOptions = {},
 ): Promise<Blob> {
-    return exporterRegistry.export(source, firstPagesSelection(pageCount, options), options)
+    return exporterRegistry.export(source, firstSectionsSelection(sectionCount, options), options)
 }
 
-export async function exportFirstPagesAsBuffer(
+export async function exportFirstSectionsAsBuffer(
     source: Book | ParserInput,
-    pageCount: number,
-    options: ExportFirstPagesOptions = {},
+    sectionCount: number,
+    options: ExportFirstSectionsOptions = {},
 ): Promise<ArrayBuffer> {
-    const blob = await exportFirstPages(source, pageCount, options)
+    const blob = await exportFirstSections(source, sectionCount, options)
     return blob.arrayBuffer()
 }
 
-export function firstPagesSelection(pageCount: number, options: ExportFirstPagesOptions = {}): ExportSelection {
+export function firstSectionsSelection(sectionCount: number, options: ExportFirstSectionsOptions = {}): ExportSelection {
     return {
-        type: 'first-pages',
-        count: pageCount,
+        type: 'first-sections',
+        count: sectionCount,
         unit: options.unit,
         includeNonLinear: options.includeNonLinear,
     }

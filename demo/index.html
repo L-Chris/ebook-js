@@ -334,7 +334,7 @@
                 <option value="20px">X-Large</option>
             </select>
             <button id="btn-settings">⚙</button>
-            <input type="number" id="export-page-count" min="1" value="3" title="Reading sections to export">
+            <input type="number" id="export-section-count" min="1" value="3" title="Reading sections to export">
             <button id="btn-export" title="Export first reading sections">Export</button>
             <button id="btn-open" class="primary">Open File</button>
             <input type="file" id="file-input" accept=".epub,.mobi,.azw,.azw3,.fb2,.cbz,.pdf" hidden>
@@ -400,7 +400,7 @@
             EBookError,
             UnsupportedFormatError,
             AdapterRequiredError,
-            exportFirstPages,
+            exportFirstSections,
         } from '../src/index.ts'
         import { epub } from '../src/parsers/epub.ts'
         import { cbz } from '../src/parsers/cbz.ts'
@@ -424,7 +424,7 @@
         const fileInput = document.getElementById('file-input')
         const btnOpen = document.getElementById('btn-open')
         const btnExport = document.getElementById('btn-export')
-        const exportPageCount = document.getElementById('export-page-count')
+        const exportSectionCount = document.getElementById('export-section-count')
         const btnSidebar = document.getElementById('btn-sidebar')
         const btnSettings = document.getElementById('btn-settings')
         const sidebar = document.getElementById('sidebar')
@@ -573,15 +573,15 @@
                 alert('Open a book before exporting.')
                 return
             }
-            const count = Number(exportPageCount.value)
+            const count = Number(exportSectionCount.value)
             if (!Number.isInteger(count) || count < 1) {
-                alert('Enter a positive page count.')
+                alert('Enter a positive section count.')
                 return
             }
 
             btnExport.disabled = true
             try {
-                const blob = await exportFirstPages(currentBook, count, { format: 'epub', parserOptions })
+                const blob = await exportFirstSections(currentBook, count, { format: 'epub', parserOptions })
                 const baseName = (currentFile?.name || 'book').replace(/\.[^.]+$/, '')
                 const url = URL.createObjectURL(blob)
                 const a = document.createElement('a')

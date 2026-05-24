@@ -8,14 +8,14 @@ export interface SelectedSection {
 }
 
 export function selectSections(book: Book, selection: ExportSelection): SelectedSection[] {
-    if (selection.type !== 'first-pages') {
+    if (selection.type !== 'first-sections') {
         throw new Error(`Unsupported export selection: ${selection.type}`)
     }
     if (!Number.isInteger(selection.count) || selection.count < 1) {
-        throw new RangeError('pageCount must be a positive integer')
+        throw new RangeError('sectionCount must be a positive integer')
     }
     if (selection.unit && selection.unit !== 'section') {
-        throw new Error(`Unsupported page unit: ${selection.unit}`)
+        throw new Error(`Unsupported export unit: ${selection.unit}`)
     }
 
     const labels = buildSectionLabels(book)

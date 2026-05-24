@@ -5,7 +5,7 @@ Complete API documentation for rebook.
 ## Table of Contents
 
 - [Parser Registry](#parser-registry)
-- [First Pages Export](#first-pages-export)
+- [First Sections Export](#first-sections-export)
 - [ReaderView](#readerview)
 - [Book](#book)
 - [Section](#section)
@@ -62,13 +62,13 @@ Returns an array of registered parser names.
 
 ---
 
-## First Pages Export
+## First Sections Export
 
 Exporters convert a normalized `Book` back into a downloadable file. The default registered exporter is `epub`, but the API is format-neutral so additional output formats can be added later without changing call sites.
 
-`exportFirstPages()` parses any registered supported input format and exports the first N portable page units using the requested exporter format. The API works in browsers and Node-compatible runtimes.
+`exportFirstSections()` parses any registered supported input format and exports the first N linear reading sections using the requested exporter format. The API works in browsers and Node-compatible runtimes.
 
-Important: the current portable page unit is `section`. For CBZ this usually means one image page. For EPUB/MOBI/FB2 it means the parser's linear spine/reading section, often a chapter or parser-split section, not a visual page after layout. Visual-page export needs renderer layout inputs such as viewport size, font size, line height, margins, and spread mode.
+Important: this count is not based on rendered visual pages. For CBZ one section usually means one image page. For EPUB/MOBI/FB2 it means the parser's linear spine/reading section, often a chapter or parser-split section. Visual-page export needs renderer layout inputs such as viewport size, font size, line height, margins, and spread mode.
 
 ```typescript
 import {
@@ -78,7 +78,7 @@ import {
     mobi,
     fb2,
     cbz,
-    exportFirstPages,
+    exportFirstSections,
 } from 'rebook'
 
 registry.register('epub', epub)
@@ -86,7 +86,7 @@ registry.register('mobi', mobi)
 registry.register('fb2', fb2)
 registry.register('cbz', cbz)
 
-const blob = await exportFirstPages(file, 5, {
+const blob = await exportFirstSections(file, 5, {
     format: 'epub',
     parserOptions: { domAdapter, urlFactory },
 })
@@ -97,22 +97,22 @@ exporterRegistry.list() // ['epub']
 For an already parsed `Book`, use `exportBook()` with an explicit selection:
 
 ```typescript
-import { exportBook, firstPagesSelection } from 'rebook'
+import { exportBook, firstSectionsSelection } from 'rebook'
 
 const book = await registry.open(file, { domAdapter, urlFactory })
-const blob = await exportBook(book, firstPagesSelection(5), { format: 'epub' })
+const blob = await exportBook(book, firstSectionsSelection(5), { format: 'epub' })
 ```
 
 In Node, write the exported buffer:
 
 ```typescript
-import { exportBookAsBuffer, firstPagesSelection } from 'rebook'
+import { exportBookAsBuffer, firstSectionsSelection } from 'rebook'
 
-const buffer = await exportBookAsBuffer(book, firstPagesSelection(5), { format: 'epub' })
+const buffer = await exportBookAsBuffer(book, firstSectionsSelection(5), { format: 'epub' })
 await fs.writeFile('first-5.epub', Buffer.from(buffer))
 ```
 
-Portable page units map to renderable sections. Non-linear sections are skipped by default.
+Non-linear sections are skipped by default.
 
 ### Custom Exporters
 
@@ -126,7 +126,7 @@ const txtExporter: Exporter = {
     format: 'txt',
     mediaType: 'text/plain',
     extension: '.txt',
-    canExport: (_book, selection) => selection.type === 'first-pages',
+    canExport: (_book, selection) => selection.type === 'first-sections',
     exportBook: async (book, selection) => {
         const sections = book.sections.slice(0, selection.count)
         const text = await Promise.all(sections.map(section => section.loadText?.() ?? section.load()))
