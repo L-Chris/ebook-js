@@ -14,6 +14,7 @@ Inspired by [foliate-js](https://github.com/johnfactotum/foliate-js), but restru
 - **AI-friendly Document Model**: SlateJS-inspired tree structure with query and mutation APIs for content manipulation (translation, annotation, restructuring)
 - **Pretext layout pipeline**: EPUB sections can expose styled text segments for one-time measurement and pure in-memory line slicing
 - **Environment-agnostic parsers**: All parsers run in browser, Node.js, or workers via adapter injection
+- **Pluggable exporters**: Export parsed books through a format-neutral exporter registry, with EPUB output built in
 - **Browser renderer**: Fast AST/Pretext virtual text renderer built-in
 - **Malformed EPUB recovery**: Multi-layer fallback for broken zip archives
 - **Framework-agnostic**: Core library works with any framework; React/Vue wrappers coming
@@ -63,6 +64,19 @@ const book = await reader.open(file)
 await reader.next()
 await reader.goTo('/path/to/chapter.xhtml#section')
 ```
+
+### Export First Pages
+
+```typescript
+import { exportFirstPages } from 'rebook'
+
+const blob = await exportFirstPages(file, 5, {
+    format: 'epub',
+    parserOptions: { domAdapter, urlFactory },
+})
+```
+
+Exporters are registered through `exporterRegistry`, so future output formats can be added without changing parser or renderer code. The current portable page unit is a linear reading section: CBZ maps this to image pages, while EPUB/MOBI/FB2 map it to spine or parser-split sections rather than visual pages after layout.
 
 ### Browser Rendering
 

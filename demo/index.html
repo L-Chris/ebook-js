@@ -77,6 +77,14 @@
             font-size: 14px;
         }
 
+        input[type="number"] {
+            width: 76px;
+            padding: 8px 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
         /* Main content */
         main {
             flex: 1;
@@ -326,6 +334,8 @@
                 <option value="20px">X-Large</option>
             </select>
             <button id="btn-settings">⚙</button>
+            <input type="number" id="export-page-count" min="1" value="3" title="Reading sections to export">
+            <button id="btn-export" title="Export first reading sections">Export</button>
             <button id="btn-open" class="primary">Open File</button>
             <input type="file" id="file-input" accept=".epub,.mobi,.azw,.azw3,.fb2,.cbz,.pdf" hidden>
         </div>
@@ -390,6 +400,7 @@
             EBookError,
             UnsupportedFormatError,
             AdapterRequiredError,
+            exportFirstPages,
         } from '../src/index.ts'
         import { epub } from '../src/parsers/epub.ts'
         import { cbz } from '../src/parsers/cbz.ts'
@@ -412,6 +423,8 @@
         const dropTarget = document.getElementById('drop-target')
         const fileInput = document.getElementById('file-input')
         const btnOpen = document.getElementById('btn-open')
+        const btnExport = document.getElementById('btn-export')
+        const exportPageCount = document.getElementById('export-page-count')
         const btnSidebar = document.getElementById('btn-sidebar')
         const btnSettings = document.getElementById('btn-settings')
         const sidebar = document.getElementById('sidebar')
@@ -428,6 +441,7 @@
         const progressText = document.getElementById('progress-text')
 
         let currentFile = null
+        let currentBook = null
         let activeTOCHref = null
         let reader = createDemoReader()
 
@@ -520,6 +534,7 @@
                 }
 
                 const book = await reader.open(file)
+                currentBook = book
                 activeTOCHref = null
 
                 // Update UI
@@ -542,6 +557,7 @@
                     message = `Error (${e.code}): ${e.message}`
                 }
                 alert(`Failed to open file: ${message}`)
+                currentBook = null
                 dropTarget.classList.remove('hidden')
             }
         }
@@ -550,6 +566,35 @@
         btnOpen.addEventListener('click', () => fileInput.click())
         fileInput.addEventListener('change', (e) => {
             if (e.target.files[0]) openFile(e.target.files[0])
+        })
+
+        btnExport.addEventListener('click', async () => {
+            if (!currentBook) {
+                alert('Open a book before exporting.')
+                return
+            }
+            const count = Number(exportPageCount.value)
+            if (!Number.isInteger(count) || count < 1) {
+                alert('Enter a positive page count.')
+                return
+            }
+
+            btnExport.disabled = true
+            try {
+                const blob = await exportFirstPages(currentBook, count, { format: 'epub' })
+                const baseName = (currentFile?.name || 'book').replace(/\.[^.]+$/, '')
+                const url = URL.createObjectURL(blob)
+                const a = document.createElement('a')
+                a.href = url
+                a.download = `${baseName}-first-${count}.epub`
+                a.click()
+                URL.revokeObjectURL(url)
+            } catch (e) {
+                console.error('Failed to export:', e)
+                alert(`Failed to export: ${e.message}`)
+            } finally {
+                btnExport.disabled = false
+            }
         })
 
         btnSidebar.addEventListener('click', () => {

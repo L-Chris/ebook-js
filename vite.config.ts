@@ -20,6 +20,8 @@ export default defineConfig({
         index: resolve(__dirname, 'src/index.ts'),
         'parsers/epub': resolve(__dirname, 'src/parsers/epub.ts'),
         'renderers/browser': resolve(__dirname, 'src/renderers/browser/index.ts'),
+        'exporters/index': resolve(__dirname, 'src/exporters/index.ts'),
+        'exporters/epub': resolve(__dirname, 'src/exporters/epub.ts'),
       },
       formats: ['es'],
     },

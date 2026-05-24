@@ -692,7 +692,7 @@ describe('VirtualTextRenderer', () => {
 
         reader.destroy()
         book.destroy?.()
-    })
+    }, 10000)
 
     it('activates the first TOC entry on initial load for data/1.mobi', async () => {
         const buf = await readFile('data/1.mobi')

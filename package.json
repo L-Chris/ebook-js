@@ -1,6 +1,6 @@
 {
   "name": "rebook",
-  "version": "0.1.5",
+  "version": "0.2.0",
   "description": "A modular e-book parsing and rendering library",
   "type": "module",
   "main": "./dist/index.js",
@@ -18,6 +18,14 @@
     "./renderers/*": {
       "types": "./dist/renderers/*.d.ts",
       "import": "./dist/renderers/*.js"
+    },
+    "./exporters": {
+      "types": "./dist/exporters/index.d.ts",
+      "import": "./dist/exporters/index.js"
+    },
+    "./exporters/*": {
+      "types": "./dist/exporters/*.d.ts",
+      "import": "./dist/exporters/*.js"
     },
     "./adapters/*": {
       "types": "./dist/adapters/*.d.ts",

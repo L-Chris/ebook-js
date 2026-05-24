@@ -157,6 +157,28 @@ export { createZipLoader, isZipFile } from './loaders'
 // Progress utilities
 export { SectionProgress, TOCProgress } from './utils/progress'
 
+// Exporters
+export {
+    exportBook,
+    exportBookAsBuffer,
+    exporterRegistry,
+    exportFirstPages,
+    exportFirstPagesAsBuffer,
+    firstPagesSelection,
+    EPUBExporter,
+    epubExporter,
+} from './exporters'
+export type {
+    Exporter,
+    ExporterFactory,
+    ExportOptions,
+    ExportFirstPagesOptions,
+    ExportFormat,
+    ExportPageUnit,
+    ExportSelection,
+    ExportSelectionType,
+} from './exporters'
+
 // Browser renderer
 export {
     VirtualTextRenderer,

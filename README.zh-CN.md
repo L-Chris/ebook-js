@@ -14,6 +14,7 @@
 - **AI 友好的文档模型**：受 SlateJS 启发的树形结构，提供查询和修改 API，支持内容操作（翻译、标注、重构）
 - **Pretext 排版管线**：EPUB 章节可输出带样式文本片段，支持一次测量、多次纯内存行切片
 - **环境无关的解析器**：所有解析器通过适配器注入，可在浏览器、Node.js 或 Worker 中运行
+- **可插拔导出器**：通过格式无关的 exporter registry 导出已解析书籍，内置 EPUB 输出
 - **浏览器渲染器**：默认使用高性能的 AST/Pretext 虚拟文本渲染器
 - **畸形 EPUB 容错**：多层回退策略处理损坏的 zip 归档
 - **框架无关**：核心库兼容任意框架；React/Vue 封装计划中
@@ -63,6 +64,19 @@ const book = await reader.open(file)
 await reader.next()
 await reader.goTo('/path/to/chapter.xhtml#section')
 ```
+
+### 导出前 N 页
+
+```typescript
+import { exportFirstPages } from 'rebook'
+
+const blob = await exportFirstPages(file, 5, {
+    format: 'epub',
+    parserOptions: { domAdapter, urlFactory },
+})
+```
+
+导出格式通过 `exporterRegistry` 注册，后续新增输出格式不需要改解析器或渲染器。当前可移植的页单位是线性阅读 section：CBZ 对应图片页，EPUB/MOBI/FB2 对应 spine 或解析器切出的阅读段，不是排版后的视觉页。
 
 ### 浏览器渲染
 

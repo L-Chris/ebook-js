@@ -1,5 +1,23 @@
 export * from './types'
 export { type Parser, type ParserInput, type ParserOptions, registry } from './parser'
+export {
+    type Exporter,
+    type ExporterFactory,
+    type ExportOptions,
+    type ExportFirstPagesOptions,
+    type ExportFormat,
+    type ExportPageUnit,
+    type ExportSelection,
+    type ExportSelectionType,
+    ExporterRegistry,
+    exporterRegistry,
+    exportBook,
+    exportBookAsBuffer,
+    exportFirstPages,
+    exportFirstPagesAsBuffer,
+    firstPagesSelection,
+    isBook,
+} from './exporter'
 export { type Renderer, type RendererConfig, type RendererStyles, type LayoutMode } from './renderer'
 export { type Loader, type LoaderEntry } from './loader'
 export { type DOMAdapter, type XMLDocument, type XMLElement, type XMLAttr } from './dom-adapter'
