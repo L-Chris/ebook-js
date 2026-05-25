@@ -315,6 +315,29 @@ describe('Translation Plugin', () => {
         expect(translatedBlocks[3].segments[0].text).toBe('Title')
     })
 
+    it('merges adjacent renderer window requests before translating', async () => {
+        const update = waitForUpdate()
+        const plugin = withTranslation({
+            model: mockModel as any,
+            mode: 'bilingual',
+            onUpdate: update.resolve
+        })
+
+        const wrappedBook = await plugin(mockBook)
+        const translationBook = wrappedBook as TestTranslationBook
+        await wrappedBook.sections[0].getBlocks!()
+
+        translationBook.requestBlockTranslations?.(0, ['b1'])
+        translationBook.requestBlockTranslations?.(0, ['b3'])
+        await update.promise
+
+        expect(generateTextMock).toHaveBeenCalledTimes(1)
+        expect(JSON.parse(generateTextMock.mock.calls[0][0].prompt)).toEqual({
+            '0': 'Hello world.',
+            '1': 'Title'
+        })
+    })
+
     it('switches display mode without requesting translations again', async () => {
         const update = waitForUpdate()
         let mode: 'bilingual' | 'replace' = 'bilingual'

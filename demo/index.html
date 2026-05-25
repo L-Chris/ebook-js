@@ -612,6 +612,7 @@
         let currentBook = null
         let activeTOCHref = null
         let reader = null
+        let refreshTimer = null
 
         const getThemeStyles = () => ({
             light: { color: '#000', background: '#fff' },
@@ -642,7 +643,7 @@
                     },
                     onUpdate: ({ sectionIndex }) => {
                         if (reader?.getLocation()?.index === sectionIndex) {
-                            reader.refresh()
+                            scheduleReaderRefresh()
                         }
                     }
                 }))
@@ -674,6 +675,14 @@
             reader = createDemoReader()
             wireReaderEvents()
             if (currentFile) await openFile(currentFile, { preserveFile: true })
+        }
+
+        function scheduleReaderRefresh() {
+            clearTimeout(refreshTimer)
+            refreshTimer = setTimeout(() => {
+                refreshTimer = null
+                reader.refresh()
+            }, 150)
         }
 
         // Format helpers
