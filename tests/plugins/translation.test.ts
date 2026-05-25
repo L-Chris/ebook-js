@@ -2,14 +2,15 @@ import { describe, it, expect, vi } from 'vitest'
 import { withTranslation } from '../../src/plugins/translation'
 import type { Book, Section, TextBlock } from '../../src/core/types'
 
-const { generateTextMock, outputArrayMock } = vi.hoisted(() => ({
-    generateTextMock: vi.fn(async (options: any) => {
+const { generateTextMock, outputArrayMock, createTranslationResponse } = vi.hoisted(() => ({
+    createTranslationResponse: async (options: any) => {
         const payload = JSON.parse(options.prompt)
         const translatedPayload = payload.map((text: string) => `[Translated] ${text}`)
         return {
             output: translatedPayload
         }
-    }),
+    },
+    generateTextMock: vi.fn(),
     outputArrayMock: vi.fn((options: any) => options)
 }))
 
@@ -33,7 +34,8 @@ const waitForUpdate = () => {
 
 describe('Translation Plugin', () => {
     beforeEach(() => {
-        generateTextMock.mockClear()
+        generateTextMock.mockReset()
+        generateTextMock.mockImplementation(createTranslationResponse)
         outputArrayMock.mockClear()
     })
 
@@ -168,5 +170,80 @@ describe('Translation Plugin', () => {
 
         expect(translatedBlocks).toHaveLength(1)
         expect(translatedBlocks[0].id).toBe('b4')
+    })
+
+    it('retries once when structured translation output is invalid', async () => {
+        const update = waitForUpdate()
+        const formatError = Object.assign(new Error('No object generated: response did not match schema.'), {
+            name: 'AI_NoObjectGeneratedError'
+        })
+        generateTextMock
+            .mockRejectedValueOnce(formatError)
+            .mockImplementationOnce(createTranslationResponse)
+
+        const plugin = withTranslation({
+            model: mockModel as any,
+            mode: 'replace',
+            onUpdate: update.resolve
+        })
+
+        const wrappedBook = await plugin(mockBook)
+        await wrappedBook.sections[0].getBlocks!()
+        await update.promise
+        const translatedBlocks = await wrappedBook.sections[0].getBlocks!()
+
+        expect(generateTextMock).toHaveBeenCalledTimes(2)
+        expect(translatedBlocks[0].segments[0].text).toBe('[Translated] Hello world.')
+    })
+
+    it('switches display mode without requesting translations again', async () => {
+        const update = waitForUpdate()
+        let mode: 'bilingual' | 'replace' = 'bilingual'
+        const plugin = withTranslation({
+            model: mockModel as any,
+            mode: () => mode,
+            onUpdate: update.resolve
+        })
+
+        const wrappedBook = await plugin(mockBook)
+        const wrappedSection = wrappedBook.sections[0]
+        await wrappedSection.getBlocks!()
+        await update.promise
+
+        const bilingualBlocks = await wrappedSection.getBlocks!()
+        expect(bilingualBlocks).toHaveLength(5)
+
+        mode = 'replace'
+        const replaceBlocks = await wrappedSection.getBlocks!()
+
+        expect(generateTextMock).toHaveBeenCalledTimes(1)
+        expect(replaceBlocks).toHaveLength(3)
+        expect(replaceBlocks[0].segments[0].text).toBe('[Translated] Hello world.')
+    })
+
+    it('translates table of contents labels when enabled', async () => {
+        let resolveTOC!: (toc: Book['toc']) => void
+        const tocPromise = new Promise<Book['toc']>(resolve => {
+            resolveTOC = resolve
+        })
+        const plugin = withTranslation({
+            model: mockModel as any,
+            translateTOC: true,
+            onTOCUpdate: resolveTOC
+        })
+
+        const wrappedBook = await plugin({
+            sections: [mockSection],
+            toc: [
+                { label: 'Chapter One', href: 's1' },
+                { label: 'Part Two', href: 's2', subitems: [{ label: 'Child', href: 's2#child' }] }
+            ]
+        })
+
+        const translatedTOC = await tocPromise
+
+        expect(translatedTOC?.[0].label).toBe('[Translated] Chapter One')
+        expect(translatedTOC?.[1].subitems?.[0].label).toBe('[Translated] Child')
+        expect(wrappedBook.toc?.[0].label).toBe('[Translated] Chapter One')
     })
 })

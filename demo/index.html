@@ -191,6 +191,7 @@
             flex: 1;
             display: flex;
             flex-direction: column;
+            position: relative;
         }
 
         #viewer {
@@ -300,6 +301,15 @@
             margin-bottom: 12px;
         }
 
+        .settings-panel input[type="text"],
+        .settings-panel input[type="password"] {
+            width: 100%;
+            padding: 8px 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 13px;
+        }
+
         .setting-row {
             display: flex;
             align-items: center;
@@ -340,6 +350,12 @@
             gap: 8px;
             margin-bottom: 12px;
         }
+
+        .setting-stack {
+            display: grid;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
     </style>
 </head>
 <body>
@@ -348,6 +364,9 @@
         <button id="btn-sidebar" title="Toggle sidebar">☰</button>
         <h1 id="book-title">rebook Demo</h1>
         <div class="controls">
+            <button id="btn-open" class="primary">Open File</button>
+            <input type="file" id="file-input" accept=".epub,.mobi,.azw,.azw3,.fb2,.cbz,.pdf" hidden>
+            <button id="btn-translate" title="Translation">Translate</button>
             <button id="btn-settings" title="Settings">⚙</button>
         </div>
     </header>
@@ -355,10 +374,6 @@
     <!-- Settings panel -->
     <div class="settings-panel" id="settings-panel">
         <h3>Settings</h3>
-        <div class="setting-actions">
-            <button id="btn-open" class="primary">Open File</button>
-            <input type="file" id="file-input" accept=".epub,.mobi,.azw,.azw3,.fb2,.cbz,.pdf" hidden>
-        </div>
         <div class="setting-row">
             <label>Layout</label>
             <select id="layout-select">
@@ -401,18 +416,32 @@
             <label>Hyphenate</label>
             <input type="checkbox" id="hyphenate-check" checked>
         </div>
+    </div>
+
+    <!-- Translation panel -->
+    <div class="settings-panel" id="translation-panel">
+        <h3>Translation</h3>
         <div class="setting-row">
-            <label>Translate (AI)</label>
+            <label>Enable</label>
             <input type="checkbox" id="translate-check">
         </div>
-        <div class="setting-row" id="api-key-row" style="display: none; flex-direction: column; align-items: stretch; gap: 8px;">
-            <input type="text" id="baseurl-input" placeholder="API Base URL (Optional)" style="padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px;">
-            <input type="password" id="api-key-input" placeholder="OpenAI API Key" style="padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px;">
-            <input type="text" id="model-input" placeholder="Model (Default: gpt-4o-mini)" style="padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px;">
-            <select id="translate-mode-select" style="padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px;">
+        <div id="translation-fields">
+            <div class="setting-stack">
+                <input type="text" id="baseurl-input" placeholder="API Base URL (Optional)">
+                <input type="password" id="api-key-input" placeholder="OpenAI API Key">
+                <input type="text" id="model-input" placeholder="Model (Default: gpt-4o-mini)">
+            </div>
+            <div class="setting-row">
+                <label>Mode</label>
+                <select id="translate-mode-select">
                 <option value="bilingual">Bilingual (对照)</option>
                 <option value="replace">Replace (替换)</option>
             </select>
+            </div>
+            <div class="setting-row">
+                <label>TOC</label>
+                <input type="checkbox" id="translate-toc-check">
+            </div>
         </div>
     </div>
 
@@ -427,14 +456,13 @@
         <!-- Viewer -->
         <div id="viewer-container">
             <div id="viewer"></div>
-        </div>
-
-        <!-- Drop target -->
-        <div class="drop-target" id="drop-target">
-            <div class="drop-box">
-                <h2>Drop an e-book here</h2>
-                <p>or use Settings to browse</p>
-                <p style="color: #aaa; font-size: 13px">Supports: EPUB, MOBI, FB2, CBZ</p>
+            <!-- Drop target -->
+            <div class="drop-target" id="drop-target">
+                <div class="drop-box">
+                    <h2>Drop an e-book here</h2>
+                    <p>or click "Open File" to browse</p>
+                    <p style="color: #aaa; font-size: 13px">Supports: EPUB, MOBI, FB2, CBZ</p>
+                </div>
             </div>
         </div>
     </main>
@@ -487,6 +515,7 @@
         const exportSectionCount = document.getElementById('export-section-count')
         const btnSidebar = document.getElementById('btn-sidebar')
         const btnSettings = document.getElementById('btn-settings')
+        const btnTranslate = document.getElementById('btn-translate')
         const sidebar = document.getElementById('sidebar')
         const tocList = document.getElementById('toc-list')
         const bookTitle = document.getElementById('book-title')
@@ -494,22 +523,93 @@
         const spreadSelect = document.getElementById('spread-select')
         const fontSizeSelect = document.getElementById('font-size-select')
         const settingsPanel = document.getElementById('settings-panel')
+        const translationPanel = document.getElementById('translation-panel')
         const themeSelect = document.getElementById('theme-select')
         const hyphenateCheck = document.getElementById('hyphenate-check')
         const translateCheck = document.getElementById('translate-check')
-        const apiKeyRow = document.getElementById('api-key-row')
+        const translationFields = document.getElementById('translation-fields')
         const baseUrlInput = document.getElementById('baseurl-input')
         const apiKeyInput = document.getElementById('api-key-input')
         const modelInput = document.getElementById('model-input')
         const translateModeSelect = document.getElementById('translate-mode-select')
+        const translateTocCheck = document.getElementById('translate-toc-check')
         const progressBar = document.getElementById('progress-bar')
         const progressFill = document.getElementById('progress-fill')
         const progressText = document.getElementById('progress-text')
 
+        const CONFIG_KEY = 'rebook-demo-config'
+        const defaultConfig = {
+            layout: 'paginated',
+            spread: '2',
+            fontSize: '16px',
+            theme: 'light',
+            hyphenate: true,
+            exportSectionCount: '3',
+            translate: false,
+            translateTOC: false,
+            baseURL: '',
+            apiKey: '',
+            model: '',
+            translateMode: 'bilingual',
+        }
+
+        const loadConfig = () => {
+            try {
+                return { ...defaultConfig, ...JSON.parse(localStorage.getItem(CONFIG_KEY) || '{}') }
+            } catch {
+                return { ...defaultConfig }
+            }
+        }
+
+        const saveConfig = () => {
+            localStorage.setItem(CONFIG_KEY, JSON.stringify({
+                layout: layoutSelect.value,
+                spread: spreadSelect.value,
+                fontSize: fontSizeSelect.value,
+                theme: themeSelect.value,
+                hyphenate: hyphenateCheck.checked,
+                exportSectionCount: exportSectionCount.value,
+                translate: translateCheck.checked,
+                translateTOC: translateTocCheck.checked,
+                baseURL: baseUrlInput.value,
+                apiKey: apiKeyInput.value,
+                model: modelInput.value,
+                translateMode: translateModeSelect.value,
+            }))
+        }
+
+        const applyConfig = (config) => {
+            layoutSelect.value = config.layout
+            spreadSelect.value = config.spread
+            fontSizeSelect.value = config.fontSize
+            themeSelect.value = config.theme
+            hyphenateCheck.checked = config.hyphenate
+            exportSectionCount.value = config.exportSectionCount
+            translateCheck.checked = config.translate
+            translateTocCheck.checked = config.translateTOC
+            baseUrlInput.value = config.baseURL
+            apiKeyInput.value = config.apiKey
+            modelInput.value = config.model
+            translateModeSelect.value = config.translateMode
+            updateTranslationFields()
+        }
+
+        const updateTranslationFields = () => {
+            translationFields.style.display = translateCheck.checked ? 'block' : 'none'
+        }
+
+        applyConfig(loadConfig())
+
         let currentFile = null
         let currentBook = null
         let activeTOCHref = null
-        let reader = createDemoReader()
+        let reader = null
+
+        const getThemeStyles = () => ({
+            light: { color: '#000', background: '#fff' },
+            dark: { color: '#ddd', background: '#1a1a1a' },
+            sepia: { color: '#5b4636', background: '#f4ecd8' },
+        })[themeSelect.value]
 
         function createDemoReader() {
             const plugins = []
@@ -524,9 +624,13 @@
                 const openai = createOpenAI(openaiOptions)
                 const modelName = modelInput.value.trim() || 'gpt-4o-mini'
                 plugins.push(withTranslation({
-                    model: openai(modelName),
+                    model: openai.chat(modelName),
                     targetLanguage: 'zh-CN',
-                    mode: translateModeSelect.value,
+                    mode: () => translateModeSelect.value,
+                    translateTOC: () => translateTocCheck.checked,
+                    onTOCUpdate: () => {
+                        renderCurrentTOC()
+                    },
                     onUpdate: ({ sectionIndex }) => {
                         if (reader?.getLocation()?.index === sectionIndex) {
                             reader.refresh()
@@ -542,7 +646,9 @@
                 parserOptions,
                 plugins,
                 styles: {
+                    ...getThemeStyles(),
                     fontSize: fontSizeSelect.value,
+                    hyphenate: hyphenateCheck.checked,
                     lineHeight: 1.7,
                     minColumnWidth: '320px',
                     maxColumnWidth: '720px',
@@ -550,6 +656,8 @@
                 },
             })
         }
+
+        reader = createDemoReader()
 
         async function recreateReader() {
             reader.destroy()
@@ -605,6 +713,11 @@
             container.appendChild(ul)
         }
 
+        const renderCurrentTOC = () => {
+            tocList.innerHTML = ''
+            renderTOC(currentBook?.toc, tocList)
+        }
+
         // Open a file
         const openFile = async (file, options = {}) => {
             try {
@@ -627,8 +740,7 @@
                 document.title = `${title} - rebook`
 
                 // Render TOC
-                tocList.innerHTML = ''
-                renderTOC(book.toc, tocList)
+                renderCurrentTOC()
 
                 // Start reading
                 await reader.goTo(0)
@@ -685,64 +797,98 @@
             sidebar.classList.toggle('hidden')
         })
 
+        const closePanels = () => {
+            settingsPanel.classList.remove('show')
+            translationPanel.classList.remove('show')
+        }
+
         btnSettings.addEventListener('click', (e) => {
             e.stopPropagation()
-            settingsPanel.classList.toggle('show')
+            const show = !settingsPanel.classList.contains('show')
+            closePanels()
+            if (show) settingsPanel.classList.add('show')
+        })
+
+        btnTranslate.addEventListener('click', (e) => {
+            e.stopPropagation()
+            const show = !translationPanel.classList.contains('show')
+            closePanels()
+            if (show) translationPanel.classList.add('show')
         })
 
         settingsPanel.addEventListener('click', (e) => {
             e.stopPropagation()
         })
 
+        translationPanel.addEventListener('click', (e) => {
+            e.stopPropagation()
+        })
+
         document.addEventListener('click', () => {
-            settingsPanel.classList.remove('show')
+            closePanels()
         })
 
         layoutSelect.addEventListener('change', (e) => {
+            saveConfig()
             reader.setLayout(e.target.value)
         })
 
         spreadSelect.addEventListener('change', (e) => {
+            saveConfig()
             reader.setSpread(Number(e.target.value))
         })
 
         fontSizeSelect.addEventListener('change', (e) => {
+            saveConfig()
             reader.setStyles({ fontSize: e.target.value })
         })
 
         themeSelect.addEventListener('change', (e) => {
-            const themes = {
-                light: { color: '#000', background: '#fff' },
-                dark: { color: '#ddd', background: '#1a1a1a' },
-                sepia: { color: '#5b4636', background: '#f4ecd8' },
-            }
-            reader.setStyles(themes[e.target.value])
+            saveConfig()
+            reader.setStyles(getThemeStyles())
         })
 
         hyphenateCheck.addEventListener('change', (e) => {
+            saveConfig()
             reader.setStyles({ hyphenate: e.target.checked })
         })
 
         translateCheck.addEventListener('change', (e) => {
-            apiKeyRow.style.display = e.target.checked ? 'flex' : 'none'
+            updateTranslationFields()
+            saveConfig()
             recreateReader()
         })
 
+        translateTocCheck.addEventListener('change', () => {
+            saveConfig()
+            if (translateCheck.checked) {
+                recreateReader()
+            } else {
+                renderCurrentTOC()
+            }
+        })
+
         baseUrlInput.addEventListener('change', () => {
+            saveConfig()
             if (translateCheck.checked) recreateReader()
         })
 
         apiKeyInput.addEventListener('change', () => {
+            saveConfig()
             if (translateCheck.checked) recreateReader()
         })
 
         modelInput.addEventListener('change', () => {
+            saveConfig()
             if (translateCheck.checked) recreateReader()
         })
 
         translateModeSelect.addEventListener('change', () => {
-            if (translateCheck.checked) recreateReader()
+            saveConfig()
+            if (translateCheck.checked) reader.refresh()
         })
+
+        exportSectionCount.addEventListener('change', saveConfig)
 
         // Progress bar click
         progressBar.addEventListener('click', (e) => {
