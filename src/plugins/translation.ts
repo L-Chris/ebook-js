@@ -5,6 +5,7 @@ const MAX_TRANSLATION_ATTEMPTS = 2
 type TranslationMode = 'replace' | 'bilingual'
 type ValueOrGetter<T> = T | (() => T)
 type TranslationUpdate = { sectionIndex: number; blocks: TextBlock[] }
+type TranslationBook = Book & { refreshTranslatedTOC?: () => void }
 
 class TranslationFormatError extends Error {
     constructor(message: string) {
@@ -62,21 +63,21 @@ export function withTranslation(options: TranslationOptions): RebookPlugin {
 
     return (book: Book): Book => {
         const starters = new Map<number, () => void>()
-        let translatedTOC: Book['toc'] | null = null
-        let tocTranslationPromise: Promise<Book['toc'] | null> | null = null
+        let translatedTOCLabels: string[] | null = null
+        let tocTranslationPromise: Promise<string[] | null> | null = null
 
         const getMode = () => getValue(mode)
         const shouldTranslateTOC = () => getValue(translateTOC)
 
-        const getTOC = () => shouldTranslateTOC() && translatedTOC ? translatedTOC : book.toc
+        const getTOC = () => renderTOCItems(book.toc, translatedTOCLabels, shouldTranslateTOC(), getMode())
 
         const startTOCTranslation = () => {
-            if (!book.toc || !shouldTranslateTOC() || tocTranslationPromise || translatedTOC) return
-            tocTranslationPromise = translateTOCItems(book.toc, model, targetLanguage)
-                .then(toc => {
-                    translatedTOC = toc
-                    onTOCUpdate?.(toc)
-                    return toc
+            if (!book.toc || !shouldTranslateTOC() || tocTranslationPromise || translatedTOCLabels) return
+            tocTranslationPromise = translateTOCLabels(book.toc, model, targetLanguage)
+                .then(labels => {
+                    translatedTOCLabels = labels
+                    onTOCUpdate?.(getTOC())
+                    return labels
                 })
                 .catch(err => {
                     tocTranslationPromise = null
@@ -146,13 +147,20 @@ export function withTranslation(options: TranslationOptions): RebookPlugin {
 
         startTOCTranslation()
 
-        return {
+        const translatedBook: TranslationBook = {
             ...book,
             get toc() {
+                startTOCTranslation()
                 return getTOC()
+            },
+            refreshTranslatedTOC() {
+                startTOCTranslation()
+                onTOCUpdate?.(getTOC())
             },
             sections: wrappedSections
         }
+
+        return translatedBook
     }
 }
 
@@ -271,25 +279,37 @@ function renderTranslatedBlocks(
     return rendered
 }
 
-async function translateTOCItems(
+async function translateTOCLabels(
     toc: NonNullable<Book['toc']>,
     model: LanguageModel,
     targetLanguage: string,
-): Promise<NonNullable<Book['toc']>> {
+): Promise<string[]> {
     const items = flattenTOC(toc)
     const labels = items.map(item => item.label)
-    if (!labels.length) return toc
+    if (!labels.length) return []
 
-    const translations = await requestTranslations(model, targetLanguage, labels)
+    return requestTranslations(model, targetLanguage, labels)
+}
+
+function renderTOCItems(
+    toc: Book['toc'],
+    translations: readonly string[] | null,
+    enabled: boolean,
+    mode: TranslationMode,
+): Book['toc'] {
+    if (!toc || !enabled || !translations) return toc
     let index = 0
-
     const mapItems = (items: NonNullable<Book['toc']>): NonNullable<Book['toc']> => items.map(item => ({
         ...item,
-        label: translations[index++] || item.label,
+        label: renderTOCLabel(item.label, translations[index++] || item.label, mode),
         subitems: item.subitems ? mapItems(item.subitems) : item.subitems,
     }))
 
     return mapItems(toc)
+}
+
+function renderTOCLabel(original: string, translated: string, mode: TranslationMode): string {
+    return mode === 'replace' ? translated : `${original} / ${translated}`
 }
 
 function flattenTOC(items: NonNullable<Book['toc']>): NonNullable<Book['toc']> {

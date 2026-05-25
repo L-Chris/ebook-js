@@ -242,8 +242,41 @@ describe('Translation Plugin', () => {
 
         const translatedTOC = await tocPromise
 
-        expect(translatedTOC?.[0].label).toBe('[Translated] Chapter One')
-        expect(translatedTOC?.[1].subitems?.[0].label).toBe('[Translated] Child')
+        expect(translatedTOC?.[0].label).toBe('Chapter One / [Translated] Chapter One')
+        expect(translatedTOC?.[1].subitems?.[0].label).toBe('Child / [Translated] Child')
+        expect(wrappedBook.toc?.[0].label).toBe('Chapter One / [Translated] Chapter One')
+    })
+
+    it('toggles translated table of contents without requesting labels again', async () => {
+        let translateTOC = true
+        let mode: 'bilingual' | 'replace' = 'bilingual'
+        let resolveTOC!: (toc: Book['toc']) => void
+        const tocPromise = new Promise<Book['toc']>(resolve => {
+            resolveTOC = resolve
+        })
+        const plugin = withTranslation({
+            model: mockModel as any,
+            translateTOC: () => translateTOC,
+            mode: () => mode,
+            onTOCUpdate: resolveTOC
+        })
+
+        const wrappedBook = await plugin({
+            sections: [mockSection],
+            toc: [{ label: 'Chapter One', href: 's1' }]
+        })
+
+        await tocPromise
+        expect(wrappedBook.toc?.[0].label).toBe('Chapter One / [Translated] Chapter One')
+
+        translateTOC = false
+        wrappedBook.refreshTranslatedTOC?.()
+        expect(wrappedBook.toc?.[0].label).toBe('Chapter One')
+
+        translateTOC = true
+        mode = 'replace'
+        wrappedBook.refreshTranslatedTOC?.()
         expect(wrappedBook.toc?.[0].label).toBe('[Translated] Chapter One')
+        expect(generateTextMock).toHaveBeenCalledTimes(1)
     })
 })

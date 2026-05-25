@@ -629,7 +629,7 @@
                     mode: () => translateModeSelect.value,
                     translateTOC: () => translateTocCheck.checked,
                     onTOCUpdate: () => {
-                        renderCurrentTOC()
+                        refreshCurrentTOC()
                     },
                     onUpdate: ({ sectionIndex }) => {
                         if (reader?.getLocation()?.index === sectionIndex) {
@@ -714,6 +714,11 @@
         }
 
         const renderCurrentTOC = () => {
+            currentBook?.refreshTranslatedTOC?.()
+            refreshCurrentTOC()
+        }
+
+        const refreshCurrentTOC = () => {
             tocList.innerHTML = ''
             renderTOC(currentBook?.toc, tocList)
         }
@@ -861,11 +866,8 @@
 
         translateTocCheck.addEventListener('change', () => {
             saveConfig()
-            if (translateCheck.checked) {
-                recreateReader()
-            } else {
-                renderCurrentTOC()
-            }
+            currentBook?.refreshTranslatedTOC?.()
+            refreshCurrentTOC()
         })
 
         baseUrlInput.addEventListener('change', () => {
@@ -885,6 +887,8 @@
 
         translateModeSelect.addEventListener('change', () => {
             saveConfig()
+            currentBook?.refreshTranslatedTOC?.()
+            refreshCurrentTOC()
             if (translateCheck.checked) reader.refresh()
         })
 
