@@ -219,6 +219,14 @@ describe('Translation Plugin', () => {
         expect(generateTextMock).toHaveBeenCalledTimes(1)
         expect(replaceBlocks).toHaveLength(3)
         expect(replaceBlocks[0].segments[0].text).toBe('[Translated] Hello world.')
+
+        mode = 'bilingual'
+        const bilingualAgainBlocks = await wrappedSection.getBlocks!()
+
+        expect(generateTextMock).toHaveBeenCalledTimes(1)
+        expect(bilingualAgainBlocks).toHaveLength(5)
+        expect(bilingualAgainBlocks[0].segments[0].text).toBe('Hello world.')
+        expect(bilingualAgainBlocks[1].segments[0].text).toBe('[Translated] Hello world.')
     })
 
     it('translates table of contents labels when enabled', async () => {

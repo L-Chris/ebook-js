@@ -99,7 +99,7 @@ export function withTranslation(options: TranslationOptions): RebookPlugin {
 
             const getOriginalBlocks = () => {
                 if (!originalBlocksPromise) {
-                    originalBlocksPromise = Promise.resolve(originalGetBlocks()).then(blocks => [...blocks])
+                    originalBlocksPromise = Promise.resolve(originalGetBlocks()).then(blocks => blocks.map(cloneTextBlock))
                 }
                 return originalBlocksPromise
             }
@@ -260,15 +260,15 @@ function renderTranslatedBlocks(
         const block = blocks[index]
         const translatedText = translatedTextByIndex.get(index)
         if (!translatedText) {
-            rendered.push(block)
+            rendered.push(cloneTextBlock(block))
             continue
         }
 
         const translatedSegments: TextSegment[] = [{ text: translatedText, style: block.segments[0]?.style }]
         if (mode === 'replace') {
-            rendered.push({ ...block, segments: translatedSegments })
+            rendered.push({ ...cloneTextBlock(block), segments: translatedSegments })
         } else {
-            rendered.push(block, {
+            rendered.push(cloneTextBlock(block), {
                 ...block,
                 id: `${block.id}-tr`,
                 segments: translatedSegments
@@ -277,6 +277,13 @@ function renderTranslatedBlocks(
     }
 
     return rendered
+}
+
+function cloneTextBlock(block: TextBlock): TextBlock {
+    return {
+        ...block,
+        segments: block.segments.map(segment => ({ ...segment, style: segment.style ? { ...segment.style } : segment.style }))
+    }
 }
 
 async function translateTOCLabels(
