@@ -287,7 +287,7 @@
             padding: 16px;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
             z-index: 30;
-            min-width: 220px;
+            width: min(320px, calc(100vw - 40px));
             display: none;
         }
 
@@ -304,12 +304,41 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
+            gap: 12px;
             margin-bottom: 12px;
+        }
+
+        .setting-row:last-child {
+            margin-bottom: 0;
         }
 
         .setting-row label {
             font-size: 13px;
             color: #666;
+            flex: 0 0 92px;
+        }
+
+        .setting-row select,
+        .setting-row input[type="number"],
+        .setting-row button {
+            flex: 1;
+        }
+
+        .setting-row .export-controls {
+            display: flex;
+            gap: 8px;
+            flex: 1;
+        }
+
+        .setting-row .export-controls input {
+            flex: 0 0 76px;
+        }
+
+        .setting-actions {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 8px;
+            margin-bottom: 12px;
         }
     </style>
 </head>
@@ -319,31 +348,47 @@
         <button id="btn-sidebar" title="Toggle sidebar">☰</button>
         <h1 id="book-title">rebook Demo</h1>
         <div class="controls">
-            <select id="layout-select">
-                <option value="paginated" selected>Paginated</option>
-                <option value="scrolled">Scrolled</option>
-            </select>
-            <select id="spread-select">
-                <option value="2">Auto Spread</option>
-                <option value="1">Single Page</option>
-            </select>
-            <select id="font-size-select">
-                <option value="14px">Small</option>
-                <option value="16px" selected>Medium</option>
-                <option value="18px">Large</option>
-                <option value="20px">X-Large</option>
-            </select>
-            <button id="btn-settings">⚙</button>
-            <input type="number" id="export-section-count" min="1" value="3" title="Reading sections to export">
-            <button id="btn-export" title="Export first reading sections">Export</button>
-            <button id="btn-open" class="primary">Open File</button>
-            <input type="file" id="file-input" accept=".epub,.mobi,.azw,.azw3,.fb2,.cbz,.pdf" hidden>
+            <button id="btn-settings" title="Settings">⚙</button>
         </div>
     </header>
 
     <!-- Settings panel -->
     <div class="settings-panel" id="settings-panel">
         <h3>Settings</h3>
+        <div class="setting-actions">
+            <button id="btn-open" class="primary">Open File</button>
+            <input type="file" id="file-input" accept=".epub,.mobi,.azw,.azw3,.fb2,.cbz,.pdf" hidden>
+        </div>
+        <div class="setting-row">
+            <label>Layout</label>
+            <select id="layout-select">
+                <option value="paginated" selected>Paginated</option>
+                <option value="scrolled">Scrolled</option>
+            </select>
+        </div>
+        <div class="setting-row">
+            <label>Spread</label>
+            <select id="spread-select">
+                <option value="2">Auto Spread</option>
+                <option value="1">Single Page</option>
+            </select>
+        </div>
+        <div class="setting-row">
+            <label>Font Size</label>
+            <select id="font-size-select">
+                <option value="14px">Small</option>
+                <option value="16px" selected>Medium</option>
+                <option value="18px">Large</option>
+                <option value="20px">X-Large</option>
+            </select>
+        </div>
+        <div class="setting-row">
+            <label>Export</label>
+            <div class="export-controls">
+                <input type="number" id="export-section-count" min="1" value="3" title="Reading sections to export">
+                <button id="btn-export" title="Export first reading sections">Export</button>
+            </div>
+        </div>
         <div class="setting-row">
             <label>Theme</label>
             <select id="theme-select">
@@ -388,7 +433,7 @@
         <div class="drop-target" id="drop-target">
             <div class="drop-box">
                 <h2>Drop an e-book here</h2>
-                <p>or click "Open File" to browse</p>
+                <p>or use Settings to browse</p>
                 <p style="color: #aaa; font-size: 13px">Supports: EPUB, MOBI, FB2, CBZ</p>
             </div>
         </div>
@@ -470,10 +515,7 @@
             const plugins = []
             
             if (translateCheck.checked && apiKeyInput.value.trim()) {
-                const openaiOptions = { 
-                    apiKey: apiKeyInput.value.trim(),
-                    dangerouslyAllowBrowser: true
-                }
+                const openaiOptions = { apiKey: apiKeyInput.value.trim() }
                 const baseUrl = baseUrlInput.value.trim()
                 if (baseUrl) {
                     openaiOptions.baseURL = baseUrl
@@ -638,8 +680,17 @@
             sidebar.classList.toggle('hidden')
         })
 
-        btnSettings.addEventListener('click', () => {
+        btnSettings.addEventListener('click', (e) => {
+            e.stopPropagation()
             settingsPanel.classList.toggle('show')
+        })
+
+        settingsPanel.addEventListener('click', (e) => {
+            e.stopPropagation()
+        })
+
+        document.addEventListener('click', () => {
+            settingsPanel.classList.remove('show')
         })
 
         layoutSelect.addEventListener('change', (e) => {
