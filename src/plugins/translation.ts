@@ -94,8 +94,9 @@ export function withTranslation(options: TranslationOptions): RebookPlugin {
             }
 
             let originalBlocksPromise: Promise<TextBlock[]> | null = null
-            let translatedTextByIndex: Map<number, string> | null = null
+            let translatedTextByIndex = new Map<number, string>()
             let translationPromise: Promise<Map<number, string>> | null = null
+            let translationComplete = false
 
             const getOriginalBlocks = () => {
                 if (!originalBlocksPromise) {
@@ -105,16 +106,17 @@ export function withTranslation(options: TranslationOptions): RebookPlugin {
             }
 
             const startTranslation = () => {
-                if (translationPromise || translatedTextByIndex) return
+                if (translationPromise || translationComplete) return
                 translationPromise = getOriginalBlocks()
-                    .then(blocks => translateBlockTexts(blocks, model, targetLanguage, concurrency, tokensPerBatch))
+                    .then(blocks => translateBlockTexts(blocks, model, targetLanguage, concurrency, tokensPerBatch, (translations) => {
+                        translatedTextByIndex = translations
+                        const renderedBlocks = renderTranslatedBlocks(blocks, translations, getMode())
+                        onUpdate?.({ sectionIndex: index, blocks: renderedBlocks })
+                    }))
                     .then(translations => {
                         translatedTextByIndex = translations
-                        return getOriginalBlocks().then(blocks => {
-                            const renderedBlocks = renderTranslatedBlocks(blocks, translations, getMode())
-                            onUpdate?.({ sectionIndex: index, blocks: renderedBlocks })
-                            return translations
-                        })
+                        translationComplete = true
+                        return translations
                     })
                     .catch(err => {
                         translationPromise = null
@@ -129,7 +131,7 @@ export function withTranslation(options: TranslationOptions): RebookPlugin {
                 ...section,
                 getBlocks: async () => {
                     const originalBlocks = await getOriginalBlocks()
-                    const blocks = translatedTextByIndex
+                    const blocks = translatedTextByIndex.size > 0
                         ? renderTranslatedBlocks(originalBlocks, translatedTextByIndex, getMode())
                         : originalBlocks
                     startTranslation()
@@ -169,7 +171,8 @@ async function translateBlockTexts(
     model: LanguageModel,
     targetLanguage: string,
     concurrency: number,
-    tokensPerBatch: number
+    tokensPerBatch: number,
+    onBatch?: (translations: Map<number, string>) => void
 ): Promise<Map<number, string>> {
     const translations = new Map<number, string>()
     const translatableItems = getTranslatableItems(blocks)
@@ -212,6 +215,7 @@ async function translateBlockTexts(
                     translations.set(index, translatedText)
                 }
             }
+            onBatch?.(new Map(translations))
         } catch (error) {
             console.error(`Batch translation failed:`, error)
         }

@@ -149,7 +149,6 @@ describe('Translation Plugin', () => {
     })
 
     it('skips blocks that are too short', async () => {
-        const update = waitForUpdate()
         const shortBlockSection: Section = {
             id: 's2',
             size: 10,
@@ -162,7 +161,6 @@ describe('Translation Plugin', () => {
         const plugin = withTranslation({
             model: mockModel as any,
             mode: 'bilingual',
-            onUpdate: update.resolve
         })
 
         const wrappedBook = await plugin({ sections: [shortBlockSection] })
@@ -171,9 +169,10 @@ describe('Translation Plugin', () => {
         expect(initialBlocks).toHaveLength(1)
         expect(initialBlocks[0].id).toBe('b4')
 
-        await update.promise
+        await new Promise(resolve => setTimeout(resolve, 0))
         const translatedBlocks = await wrappedBook.sections[0].getBlocks!()
 
+        expect(generateTextMock).not.toHaveBeenCalled()
         expect(translatedBlocks).toHaveLength(1)
         expect(translatedBlocks[0].id).toBe('b4')
     })
@@ -222,6 +221,35 @@ describe('Translation Plugin', () => {
         expect(generateTextMock).toHaveBeenCalledTimes(2)
         expect(translatedBlocks[0].segments[0].text).toBe('[Translated] Hello world.')
         expect(translatedBlocks[2].segments[0].text).toBe('[Translated] Title')
+    })
+
+    it('updates rendered blocks after each translated batch', async () => {
+        const updates: TextBlock[][] = []
+        let resolveUpdates!: () => void
+        const updatesPromise = new Promise<void>(resolve => {
+            resolveUpdates = resolve
+        })
+        const plugin = withTranslation({
+            model: mockModel as any,
+            mode: 'bilingual',
+            tokensPerBatch: 1,
+            concurrency: 1,
+            onUpdate: ({ blocks }) => {
+                updates.push(blocks)
+                if (updates.length === 2) resolveUpdates()
+            }
+        })
+
+        const wrappedBook = await plugin(mockBook)
+        await wrappedBook.sections[0].getBlocks!()
+        await updatesPromise
+
+        expect(generateTextMock).toHaveBeenCalledTimes(2)
+        expect(updates[0]).toHaveLength(4)
+        expect(updates[0][1].segments[0].text).toBe('[Translated] Hello world.')
+        expect(updates[0][3].segments[0].text).toBe('Title')
+        expect(updates[1]).toHaveLength(5)
+        expect(updates[1][4].segments[0].text).toBe('[Translated] Title')
     })
 
     it('switches display mode without requesting translations again', async () => {
