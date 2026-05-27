@@ -171,6 +171,39 @@ describe('EPUB Pretext segments', () => {
         expect(logo?.image?.alt).toBe('XML Press')
     })
 
+    it('keeps Structured Writing program listings preformatted', async () => {
+        const parser = new EPUBParser()
+        const data = await readFile('data/Structured Writing Rhetoric and Process.epub')
+        const book = await parser.parse(data.buffer.slice(
+            data.byteOffset,
+            data.byteOffset + data.byteLength,
+        ), {
+            domAdapter: new NodeDOMAdapter(),
+            urlFactory: new NodeURLFactory(),
+        })
+
+        const chapter3 = book.sections.find(section => String(section.id).endsWith('ch03.html'))
+        expect(chapter3).toBeDefined()
+
+        const blocks = await chapter3!.getBlocks?.()
+        const listing = blocks?.find(block =>
+            block.type === 'pre'
+            && block.segments.map(segment => segment.text).join('').includes('<p>Dogs</p>')
+        )
+        const text = listing?.segments.map(segment => segment.text).join('')
+
+        expect(text).toContain('<ol>\n    <li>\n        <p>Dogs</p>')
+        expect(text).toContain('            <li>Spot</li>')
+
+        const prepared = prepareBlocks([listing!], { baseStyle: { fontSize: 10, lineHeight: 2 } })
+        const lines = layout(prepared, { inlineSize: 1_000 })
+        const lineTexts = lines.map(line => line.text)
+        expect(lineTexts).toContain('<ol>')
+        expect(lineTexts).toContain('\u00a0\u00a0\u00a0\u00a0<li>')
+        expect(lineTexts).toContain('\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0<p>Dogs</p>')
+        expect(lineTexts).toContain('\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0<li>Spot</li>')
+    })
+
     it('extracts tables and figure blocks from The Accidental Taxonomist', async () => {
         const parser = new EPUBParser()
         const data = await readFile('data/The Accidental Taxonomist.epub')

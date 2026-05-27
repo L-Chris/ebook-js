@@ -258,6 +258,26 @@ describe('Pretext pipeline', () => {
         expect(wide[0].segments[0].text).toBe('one two three four')
     })
 
+    it('preserves preformatted newlines and indentation during layout', () => {
+        const blocks = extractDocumentBlocks([
+            elementNode('pre', { class: 'programlisting' }, [
+                textNode('\n<ol>\n    <li>Dogs</li>\n    <li>Cats</li>\n</ol>\n'),
+            ]),
+        ], { fontSize: 10, lineHeight: 2 })
+
+        expect(blocks[0].segments.map(segment => segment.text).join('')).toBe('<ol>\n    <li>Dogs</li>\n    <li>Cats</li>\n</ol>')
+
+        const prepared = prepareBlocks(blocks, { baseStyle: { fontSize: 10, lineHeight: 2 } })
+        const lines = layout(prepared, { inlineSize: 300 })
+        const indent = '\u00a0\u00a0\u00a0\u00a0'
+        expect(lines.map(line => line.text)).toEqual([
+            '<ol>',
+            `${indent}<li>Dogs</li>`,
+            `${indent}<li>Cats</li>`,
+            '</ol>',
+        ])
+    })
+
     it('returns a virtualized visible line window', () => {
         const prepared = prepare([{ text: 'a b c d e f g h i j' }], { baseStyle: { fontSize: 10, lineHeight: 1 } })
         const lines = layout(prepared, { inlineSize: 12 })

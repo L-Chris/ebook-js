@@ -136,7 +136,7 @@ export function extractDocumentBlocks(
         segments: TextSegment[],
         depth?: number,
     ) => {
-        const normalized = normalizeSegments(segments)
+        const normalized = type === 'pre' ? normalizePreSegments(segments) : normalizeSegments(segments)
         if (!normalized.some(segment => segment.text.trim())) return
         const preset = getBlockPreset(type, baseStyle, depth)
         blocks.push({
@@ -310,7 +310,7 @@ export function extractDocumentBlocks(
         }
 
         if (type === 'pre') {
-            pushBlock('pre', node, collectInlineSegments(node, inherited))
+            pushBlock('pre', node, collectInlineSegments(node, inherited), undefined)
             return
         }
 
@@ -459,6 +459,70 @@ export function layout(prepared: PreparedText, options: LayoutOptions): LineRang
             })
             top += metrics.height
             top += block.block.blockGapAfter ?? blockGap
+            continue
+        }
+        if (block.block.type === 'pre') {
+            const preLines = splitPreLines(block, prepared)
+            for (const preLine of preLines) {
+                if (preLine.length === 0) {
+                    lines.push({
+                        index: lines.length,
+                        kind: 'text',
+                        block: block.block,
+                        start: null,
+                        end: null,
+                        text: '',
+                        width: 0,
+                        top,
+                        height: lineHeight,
+                        segments: [],
+                    })
+                    top += lineHeight
+                    continue
+                }
+
+                const richInline = prepareRichInline(preLine.map(item => ({
+                    text: toPreLayoutText(item.text),
+                    font: toCanvasFont({ ...prepared.baseStyle, ...item.style }),
+                    letterSpacing: item.style?.letterSpacing,
+                    break: item.break,
+                    extraWidth: item.extraWidth,
+                })))
+                walkRichInlineLineRanges(richInline, inlineSize, (range) => {
+                    const materialized = materializeRichInlineLineRange(richInline, range)
+                    const fragments = materialized.fragments.map((fragment, index): LineSegmentRange => {
+                        const rangeFragment = range.fragments[index]!
+                        const sourceItem = preLine[fragment.itemIndex]!
+                        return {
+                            segmentIndex: sourceItem.segmentIndex,
+                            start: rangeFragment.start,
+                            end: rangeFragment.end,
+                            text: fragment.text,
+                            style: sourceItem.style ?? {},
+                            source: sourceItem.source,
+                            gapBefore: fragment.gapBefore,
+                            occupiedWidth: fragment.occupiedWidth,
+                        }
+                    })
+                    const first = fragments[0]
+                    const last = fragments[fragments.length - 1]
+                    lines.push({
+                        index: lines.length,
+                        kind: 'text',
+                        block: block.block,
+                        start: first ? { segmentIndex: first.segmentIndex, cursor: first.start } : null,
+                        end: last ? { segmentIndex: last.segmentIndex, cursor: last.end } : null,
+                        text: joinFragments(fragments),
+                        width: materialized.width,
+                        top,
+                        height: lineHeight,
+                        segments: fragments,
+                    })
+                    top += lineHeight
+                })
+            }
+
+            if (lines.length > blockStartCount) top += block.block.blockGapAfter ?? blockGap
             continue
         }
         const richInline = block.prepared
@@ -1046,6 +1110,75 @@ function normalizeSegments(segments: TextSegment[]): TextSegment[] {
     return normalized
 }
 
+function normalizePreSegments(segments: TextSegment[]): TextSegment[] {
+    const normalized: TextSegment[] = []
+    for (const segment of segments) {
+        const text = segment.text.replace(/\r\n?/g, '\n')
+        if (!text) continue
+        const last = normalized[normalized.length - 1]
+        if (last && sameStyle(last.style, segment.style) && sameSource(last.source, segment.source)) {
+            normalized[normalized.length - 1] = { ...last, text: last.text + text }
+        } else {
+            normalized.push({ ...segment, text })
+        }
+    }
+
+    trimPreBoundaryNewline(normalized, 'start')
+    trimPreBoundaryNewline(normalized, 'end')
+    return normalized
+}
+
+function trimPreBoundaryNewline(segments: TextSegment[], edge: 'start' | 'end'): void {
+    while (segments.length > 0) {
+        const index = edge === 'start' ? 0 : segments.length - 1
+        const text = segments[index]?.text ?? ''
+        if (edge === 'start' && text.startsWith('\n')) {
+            const nextText = text.slice(1)
+            if (nextText) segments[index] = { ...segments[index], text: nextText }
+            else segments.shift()
+            continue
+        }
+        if (edge === 'end' && text.endsWith('\n')) {
+            const nextText = text.slice(0, -1)
+            if (nextText) segments[index] = { ...segments[index], text: nextText }
+            else segments.pop()
+            continue
+        }
+        break
+    }
+}
+
+interface PreLineItem extends TextSegment {
+    segmentIndex: number
+}
+
+function splitPreLines(block: PreparedTextBlock, prepared: PreparedText): PreLineItem[][] {
+    const lines: PreLineItem[][] = [[]]
+    block.block.segments.forEach((segment, itemIndex) => {
+        const segmentIndex = block.itemSegmentIndexes[itemIndex]!
+        const style = prepared.segments[segmentIndex]?.style ?? segment.style ?? {}
+        const source = prepared.segments[segmentIndex]?.source ?? segment.source
+        const parts = segment.text.split('\n')
+        parts.forEach((part, partIndex) => {
+            if (partIndex > 0) lines.push([])
+            if (part) {
+                lines[lines.length - 1]!.push({
+                    ...segment,
+                    text: part,
+                    style,
+                    source,
+                    segmentIndex,
+                })
+            }
+        })
+    })
+    return lines
+}
+
+function toPreLayoutText(text: string): string {
+    return text.replace(/\t/g, '    ').replace(/ /g, '\u00a0')
+}
+
 function applyNodeStyle(
     type: string,
     inherited: TextStyle,
@@ -1054,6 +1187,10 @@ function applyNodeStyle(
     const style = { ...inherited, ...parseInlineStyle(attrs?.style) }
     if (type === 'strong' || type === 'b') style.fontWeight = '700'
     if (type === 'em' || type === 'i' || type === 'cite') style.fontStyle = 'italic'
+    if (type === 'code' || type === 'kbd' || type === 'samp' || type === 'tt') {
+        style.fontFamily = 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace'
+        style.fontSize = (style.fontSize ?? inherited.fontSize ?? DEFAULT_STYLE.fontSize) * 0.92
+    }
     if (type === 'u') style.textDecoration = 'underline'
     if (type === 's' || type === 'strike' || type === 'del') style.textDecoration = 'line-through'
     if (type === 'sup' || type === 'sub') {
