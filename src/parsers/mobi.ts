@@ -839,6 +839,8 @@ const htmlVoidTagRegex = /<(area|base|br|col|embed|hr|img|input|link|meta|param|
 
 function sanitizeMOBI6HTML(str: string): string {
     return str
+        .replace(/<!doctype[^>]*>/gi, '')
+        .replace(/<\/?(?:html|head|body)\b[^>]*>/gi, '')
         .replace(/\s(filepos|recindex)=["']?(\d+)["']?/gi, ' $1="$2"')
         .replace(selfClosingRegex, '<$1></$1>')
         .replace(htmlVoidTagRegex, (match, tag: string, attrs: string) =>

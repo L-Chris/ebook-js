@@ -77,7 +77,7 @@ export interface LineSegmentRange {
 
 export interface LineRange {
     index: number
-    kind: 'text' | 'image' | 'table'
+    kind: 'text' | 'image' | 'table' | 'separator'
     block?: TextBlock
     image?: TextImage
     table?: TextTable
@@ -176,6 +176,32 @@ export function extractDocumentBlocks(
         })
     }
 
+    const pushBreakBlock = (node: DocumentNode) => {
+        const fontSize = baseStyle.fontSize ?? DEFAULT_STYLE.fontSize
+        blocks.push({
+            id: node.attrs?.id ?? `break-${nextId++}`,
+            type: 'break',
+            attrs: node.attrs,
+            style: { fontSize, lineHeight: baseStyle.lineHeight ?? DEFAULT_STYLE.lineHeight },
+            blockGapBefore: 0,
+            blockGapAfter: 0,
+            segments: [],
+        })
+    }
+
+    const pushSeparatorBlock = (node: DocumentNode) => {
+        const fontSize = baseStyle.fontSize ?? DEFAULT_STYLE.fontSize
+        blocks.push({
+            id: node.attrs?.id ?? `separator-${nextId++}`,
+            type: 'separator',
+            attrs: node.attrs,
+            style: parseInlineStyle(node.attrs?.style),
+            blockGapBefore: fontSize * 0.4,
+            blockGapAfter: fontSize * 0.4,
+            segments: [],
+        })
+    }
+
     const pushTableBlocks = (node: DocumentNode) => {
         const table = getTableData(node)
         if (!table || table.rows.length === 0) return
@@ -216,6 +242,16 @@ export function extractDocumentBlocks(
         if (type === 'script' || type === 'style' || type === 'head') return
         if (isFootnoteContentNode(node)) return
 
+        if (type === 'br') {
+            pushBreakBlock(node)
+            return
+        }
+
+        if (type === 'hr') {
+            pushSeparatorBlock(node)
+            return
+        }
+
         if (isImageNode(type, node)) {
             pushImageBlock(node)
             return
@@ -234,7 +270,11 @@ export function extractDocumentBlocks(
         }
 
         if (type === 'p') {
-            pushBlock('paragraph', node, collectInlineSegments(node, inherited))
+            const segments = collectInlineSegments(node, inherited)
+            pushBlock('paragraph', node, segments)
+            if (!segments.some(segment => segment.text.trim()) && segments.some(segment => segment.text.includes('\n'))) {
+                pushBreakBlock(node)
+            }
             for (const image of collectImageNodes(node)) pushImageBlock(image)
             return
         }
@@ -298,10 +338,16 @@ export function prepareBlocks(
     const segments = textBlocks.flatMap(block => block.segments)
     let nextSegmentIndex = 0
     const blocks = textBlocks
-        .filter(block => block.type === 'image' || block.type === 'table' || block.segments.some(segment => segment.text.trim()))
+        .filter(block =>
+            block.type === 'image'
+            || block.type === 'table'
+            || block.type === 'break'
+            || block.type === 'separator'
+            || block.segments.some(segment => segment.text.trim())
+        )
         .map(block => {
         const itemSegmentIndexes = block.segments.map(() => nextSegmentIndex++)
-        if (block.type === 'image' || block.type === 'table') {
+        if (block.type === 'image' || block.type === 'table' || block.type === 'break' || block.type === 'separator') {
             return {
                 itemSegmentIndexes,
                 block,
@@ -335,6 +381,40 @@ export function layout(prepared: PreparedText, options: LayoutOptions): LineRang
     for (const block of prepared.blocks) {
         const blockStartCount = lines.length
         if (blockStartCount > 0) top += block.block.blockGapBefore ?? 0
+        if (block.block.type === 'break') {
+            lines.push({
+                index: lines.length,
+                kind: 'text',
+                block: block.block,
+                start: null,
+                end: null,
+                text: '',
+                width: 0,
+                top,
+                height: lineHeight,
+                segments: [],
+            })
+            top += lineHeight
+            top += block.block.blockGapAfter ?? blockGap
+            continue
+        }
+        if (block.block.type === 'separator') {
+            lines.push({
+                index: lines.length,
+                kind: 'separator',
+                block: block.block,
+                start: null,
+                end: null,
+                text: '',
+                width: inlineSize,
+                top,
+                height: lineHeight,
+                segments: [],
+            })
+            top += lineHeight
+            top += block.block.blockGapAfter ?? blockGap
+            continue
+        }
         if (block.block.type === 'image' && block.block.image) {
             const metrics = getImageBlockMetrics(block.block.image, inlineSize, lineHeight, options.maxBlockHeight)
             top = avoidAtomicBlockPageBreak(top, metrics.height, options.maxBlockHeight, lineHeight)
@@ -650,8 +730,13 @@ function getTableCellAlign(node: DocumentNode): TextTableCell['align'] | undefin
 }
 
 function isImageNode(type: string, node: DocumentNode): boolean {
-    if (type === 'img') return Boolean(node.attrs?.src)
-    if (type === 'image') return Boolean(node.attrs?.href ?? node.attrs?.src)
+    if (type === 'img') return Boolean(node.attrs?.src ?? node.attrs?.['data-rebook-original-src'])
+    if (type === 'image') return Boolean(
+        node.attrs?.href
+        ?? node.attrs?.src
+        ?? node.attrs?.['data-rebook-original-href']
+        ?? node.attrs?.['data-rebook-original-src']
+    )
     return false
 }
 
@@ -660,7 +745,11 @@ function getImageData(
     coverImageSrcs: ReadonlySet<string>,
 ): TextImage | null {
     const attrs = node.attrs ?? {}
-    const src = attrs.src ?? attrs.href
+    const src = attrs.src
+        ?? attrs.href
+        ?? attrs['data-rebook-original-src']
+        ?? attrs['data-rebook-original-href']
+        ?? attrs['data-rebook-original-data']
     if (!src) return null
 
     const imageStyle = parseImageStyle(attrs.style)
@@ -967,6 +1056,11 @@ function applyNodeStyle(
     if (type === 'em' || type === 'i' || type === 'cite') style.fontStyle = 'italic'
     if (type === 'u') style.textDecoration = 'underline'
     if (type === 's' || type === 'strike' || type === 'del') style.textDecoration = 'line-through'
+    if (type === 'sup' || type === 'sub') {
+        style.fontSize = (style.fontSize ?? inherited.fontSize ?? DEFAULT_STYLE.fontSize) * 0.75
+        style.verticalAlign = type === 'sup' ? 'super' : 'sub'
+        style.lineHeight = inherited.lineHeight
+    }
     if (/^h[1-6]$/.test(type)) {
         const level = Number(type[1])
         style.fontWeight = '700'
@@ -988,6 +1082,7 @@ function parseInlineStyle(style?: string): TextStyle {
         else if (name === 'letter-spacing') result.letterSpacing = parseCSSPixels(value)
         else if (name === 'color') result.color = value
         else if (name === 'text-decoration') result.textDecoration = value
+        else if (name === 'vertical-align') result.verticalAlign = value
     }
     return result
 }

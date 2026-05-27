@@ -507,6 +507,8 @@ class ResourceLoader {
                 doc = this.domAdapter.parseHTML(str, MIME.HTML)
             }
 
+            await this.applyLinkedStyles(doc, href)
+
             // Replace href/src/data/poster attributes
             const replace = async (el: XMLElement, attr: string) => {
                 const val = el.getAttribute(attr)
@@ -587,7 +589,55 @@ class ResourceLoader {
         const href = resolveURL(url, base)
         const item = this.manifest.find(m => m.href === href)
         if (!item) return url
-        return this.loadItem(item)
+        return (await this.loadItem(item)) || href
+    }
+
+    private async applyLinkedStyles(doc: XMLDocument, href: string): Promise<void> {
+        const cssTexts: string[] = []
+        for (const el of doc.querySelectorAll('style')) {
+            if (el.textContent) cssTexts.push(el.textContent)
+        }
+        for (const el of doc.querySelectorAll('link[href]')) {
+            const url = el.getAttribute('href')
+            if (!url || isExternal(url)) continue
+            const cssHref = resolveURL(url, href)
+            const item = this.manifest.find(m => m.href === cssHref)
+            if (!item || item.mediaType !== MIME.CSS) continue
+            const css = await this.loadCSSWithImports(cssHref)
+            if (css) cssTexts.push(css)
+        }
+
+        const rules = parseSimpleClassRules(cssTexts.join('\n'))
+        if (!rules.length) return
+
+        for (const el of doc.querySelectorAll('[class]')) {
+            const classNames = new Set((el.getAttribute('class') ?? '').split(/\s+/).filter(Boolean))
+            if (!classNames.size) continue
+            const tagName = el.localName.toLowerCase()
+            const declarations = rules
+                .filter(rule => rule.matches(tagName, classNames))
+                .map(rule => rule.declarations)
+                .join('; ')
+            if (!declarations) continue
+            el.setAttribute('style', mergeStyleDeclarations(declarations, el.getAttribute('style') ?? ''))
+        }
+    }
+
+    private async loadCSSWithImports(href: string, seen = new Set<string>()): Promise<string> {
+        if (seen.has(href)) return ''
+        seen.add(href)
+        const css = await this.loadText(href)
+        if (!css) return ''
+
+        const imports: string[] = []
+        for (const match of css.matchAll(/@import\s+(?:url\(\s*)?["']?([^"')\s]+)["']?\s*\)?[^;]*;/gi)) {
+            const importHref = resolveURL(match[1], href)
+            const item = this.manifest.find(m => m.href === importHref)
+            if (item?.mediaType === MIME.CSS) {
+                imports.push(await this.loadCSSWithImports(importHref, seen))
+            }
+        }
+        return [...imports, css].filter(Boolean).join('\n')
     }
 
     private async replaceCSS(str: string, href: string): Promise<string> {
@@ -629,6 +679,73 @@ class ResourceLoader {
         this.cache.clear()
         this.refCount.clear()
     }
+}
+
+interface SimpleClassRule {
+    matches(tagName: string, classNames: ReadonlySet<string>): boolean
+    declarations: string
+}
+
+function parseSimpleClassRules(css: string): SimpleClassRule[] {
+    const rules: SimpleClassRule[] = []
+    const withoutComments = css.replace(/\/\*[\s\S]*?\*\//g, '')
+    for (const match of withoutComments.matchAll(/([^{}]+)\{([^{}]+)\}/g)) {
+        const declarations = normalizeStyleDeclarations(match[2])
+        if (!declarations) continue
+        for (const selector of match[1].split(',')) {
+            const parsed = parseSimpleClassSelector(selector.trim())
+            if (!parsed) continue
+            rules.push({
+                declarations,
+                matches: (tagName, classNames) =>
+                    (!parsed.tagName || parsed.tagName === tagName)
+                    && parsed.classNames.every(className => classNames.has(className)),
+            })
+        }
+    }
+    return rules
+}
+
+function parseSimpleClassSelector(selector: string): { tagName?: string; classNames: string[] } | null {
+    const withoutPseudo = selector.replace(/:{1,2}[\w-]+(?:\([^)]*\))?/g, '')
+    if (!withoutPseudo || /[\s>+~#[\]]/.test(withoutPseudo)) return null
+    const tagMatch = withoutPseudo.match(/^[a-zA-Z][\w-]*/)
+    const tagName = tagMatch?.[0].toLowerCase()
+    const classMatches = [...withoutPseudo.matchAll(/\.([_a-zA-Z-][\w-]*)/g)].map(match => unescapeCSSIdentifier(match[1]))
+    if (!classMatches.length) return null
+    const consumed = `${tagName ?? ''}${classMatches.map(className => `.${className}`).join('')}`
+    if (consumed !== withoutPseudo) return null
+    return { tagName, classNames: classMatches }
+}
+
+function normalizeStyleDeclarations(style: string): string {
+    return parseStyleDeclarations(style)
+        .map(([name, value]) => `${name}: ${value}`)
+        .join('; ')
+}
+
+function mergeStyleDeclarations(base: string, override: string): string {
+    const merged = new Map<string, string>()
+    for (const [name, value] of parseStyleDeclarations(base)) merged.set(name, value)
+    for (const [name, value] of parseStyleDeclarations(override)) merged.set(name, value)
+    return [...merged.entries()].map(([name, value]) => `${name}: ${value}`).join('; ')
+}
+
+function parseStyleDeclarations(style: string): Array<[string, string]> {
+    return style
+        .split(';')
+        .map(part => {
+            const index = part.indexOf(':')
+            if (index < 0) return null
+            const name = part.slice(0, index).trim().toLowerCase()
+            const value = part.slice(index + 1).trim()
+            return name && value ? [name, value] as [string, string] : null
+        })
+        .filter((item): item is [string, string] => item !== null)
+}
+
+function unescapeCSSIdentifier(value: string): string {
+    return value.replace(/\\(.)/g, '$1')
 }
 
 function isNavigationHrefElement(el: XMLElement): boolean {

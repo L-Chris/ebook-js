@@ -92,6 +92,41 @@ describe('Pretext pipeline', () => {
         ])
     })
 
+    it('preserves explicit break and separator blocks', () => {
+        const blocks = extractDocumentBlocks([
+            elementNode('p', {}, [elementNode('br')]),
+            elementNode('hr', { id: 'rule' }),
+        ], { fontSize: 10, lineHeight: 2 })
+
+        expect(blocks.map(block => block.type)).toEqual(['break', 'separator'])
+        expect(blocks[1].id).toBe('rule')
+
+        const lines = layout(prepareBlocks(blocks, { baseStyle: { fontSize: 10, lineHeight: 2 } }), {
+            inlineSize: 100,
+        })
+        expect(lines.map(line => line.kind)).toEqual(['text', 'separator'])
+        expect(lines[0].height).toBe(20)
+        expect(lines[1].width).toBe(100)
+    })
+
+    it('applies superscript and subscript inline styles', () => {
+        const blocks = extractDocumentBlocks([
+            elementNode('p', {}, [
+                textNode('H'),
+                elementNode('sub', {}, [textNode('2')]),
+                textNode('O'),
+                elementNode('sup', {}, [textNode('1')]),
+            ]),
+        ], { fontSize: 20, lineHeight: 1.5 })
+
+        const sub = blocks[0].segments.find(segment => segment.text === '2')
+        const sup = blocks[0].segments.find(segment => segment.text === '1')
+        expect(sub?.style?.fontSize).toBe(15)
+        expect(sub?.style?.verticalAlign).toBe('sub')
+        expect(sup?.style?.fontSize).toBe(15)
+        expect(sup?.style?.verticalAlign).toBe('super')
+    })
+
     it('extracts image blocks with sizing and cover metadata', () => {
         const blocks = extractDocumentBlocks([
             elementNode('p', {}, [

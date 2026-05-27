@@ -259,6 +259,61 @@ describe('EPUB Pretext segments', () => {
         expect(urlFactory.hasURL(image!.image!.src)).toBe(true)
     })
 
+    it('applies linked CSS class dimensions before extracting image blocks', async () => {
+        const parser = new EPUBParser()
+        const book = await parser.parse(await createTestEPUB({
+            chapters: [{
+                id: 'css-sized-image',
+                title: 'CSS Sized Image',
+                content: '<html xmlns="http://www.w3.org/1999/xhtml"><head><link href="styles/book.css" rel="stylesheet" type="text/css"/></head><body><p><img class="height-12em framed" src="images/pic.png" alt="pic"/></p></body></html>',
+            }],
+            resources: [
+                {
+                    id: 'css',
+                    href: 'styles/book.css',
+                    mediaType: 'text/css',
+                    data: '.height-12em { height: 12em; } img.framed { max-width: 10em; }',
+                },
+                {
+                    id: 'pic',
+                    href: 'images/pic.png',
+                    mediaType: 'image/png',
+                    data: new Uint8Array([0x89, 0x50, 0x4e, 0x47]),
+                },
+            ],
+        }), {
+            domAdapter: new NodeDOMAdapter(),
+            urlFactory: new NodeURLFactory(),
+        })
+
+        const blocks = await book.sections[0].getBlocks?.()
+        const image = blocks?.find(block => block.type === 'image')?.image
+        expect(image?.style?.height).toBe(192)
+        expect(image?.style?.maxWidth).toBe(160)
+    })
+
+    it('keeps image blocks when corrupt archives cannot extract referenced resources', async () => {
+        const parser = new EPUBParser()
+        const data = await readFile('data/1.epub')
+        const book = await parser.parse(data.buffer.slice(
+            data.byteOffset,
+            data.byteOffset + data.byteLength,
+        ), {
+            domAdapter: new NodeDOMAdapter(),
+            urlFactory: new NodeURLFactory(),
+        })
+
+        const section = book.sections.find(section => String(section.id).endsWith('p-012.xhtml'))
+        expect(section).toBeDefined()
+
+        const blocks = await section!.getBlocks?.()
+        const missingArchiveImage = blocks?.find(block => block.type === 'image' && block.image?.originalSrc?.endsWith('p168.jpg'))
+        const readableImage = blocks?.find(block => block.type === 'image' && block.image?.originalSrc?.endsWith('p191.jpg'))
+
+        expect(missingArchiveImage?.image?.src).toBe('item/image/p168.jpg')
+        expect(readableImage?.image?.src.startsWith('test://resource-')).toBe(true)
+    })
+
     it('does not promote footnote marker images from Gui Women to block images', async () => {
         const parser = new EPUBParser()
         const data = await readFile('data/归我们未来经济社会的行动指南.epub')

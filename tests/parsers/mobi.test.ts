@@ -3,6 +3,7 @@
  */
 
 import { describe, it, expect, beforeAll } from 'vitest'
+import { readFile } from 'node:fs/promises'
 import { MOBIParser, mobi } from '../../src/parsers/mobi'
 import { createTestMOBI, createTestMOBIBlob } from '../fixtures/mobi-fixture'
 import { NodeDOMAdapter, NodeURLFactory } from '../../src/adapters/node'
@@ -74,6 +75,18 @@ describe('MOBIParser', () => {
 
             expect(book).toBeDefined()
             expect(book.sections.length).toBeGreaterThanOrEqual(1)
+        })
+
+        it('parses data/1.mobi with wrapped HTML fragments', async () => {
+            const data = await readFile('data/1.mobi')
+            const book = await parser.parse(data.buffer.slice(
+                data.byteOffset,
+                data.byteOffset + data.byteLength,
+            ), options)
+
+            expect(book.sections.length).toBeGreaterThan(0)
+            const firstBlocks = await book.sections[0].getBlocks?.()
+            expect(firstBlocks?.some(block => block.segments.some(segment => segment.text.trim()))).toBe(true)
         })
 
         it('should extract metadata: title', async () => {

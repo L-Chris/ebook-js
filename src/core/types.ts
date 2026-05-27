@@ -92,6 +92,7 @@ export interface TextStyle {
     lineHeight?: number
     color?: string
     textDecoration?: string
+    verticalAlign?: string
     letterSpacing?: number
 }
 
@@ -164,7 +165,7 @@ export interface TextTable {
 /**
  * Normalized reading block extracted from the HTML AST.
  */
-export type TextBlockType = 'container' | 'chapter' | 'heading' | 'paragraph' | 'listItem' | 'blockquote' | 'pre' | 'image' | 'table'
+export type TextBlockType = 'container' | 'chapter' | 'heading' | 'paragraph' | 'listItem' | 'blockquote' | 'pre' | 'break' | 'separator' | 'image' | 'table'
 
 export interface TextBlock {
     id: string

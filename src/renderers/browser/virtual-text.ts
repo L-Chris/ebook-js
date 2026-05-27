@@ -439,6 +439,10 @@ export class VirtualTextRenderer implements Renderer {
                 this.content.appendChild(this.createTableLine(line, position))
                 continue
             }
+            if (line.kind === 'separator') {
+                this.content.appendChild(this.createSeparatorLine(line, position))
+                continue
+            }
             const lineEl = document.createElement('div')
             lineEl.style.cssText = `
                 position: absolute;
@@ -518,6 +522,33 @@ export class VirtualTextRenderer implements Renderer {
             object-fit: ${image.style?.objectFit ?? 'contain'};
         `
         wrapper.appendChild(img)
+        return wrapper
+    }
+
+    private createSeparatorLine(line: LineRange, position: { top: number; left: number }): HTMLElement {
+        const layout = this.columnLayout
+        const wrapper = document.createElement('div')
+        wrapper.style.cssText = `
+            position: absolute;
+            top: ${position.top}px;
+            left: ${position.left}px;
+            width: ${layout.columnWidth}px;
+            height: ${line.height}px;
+            display: flex;
+            align-items: center;
+        `
+        if (line.block) {
+            wrapper.dataset.blockId = line.block.id
+            wrapper.dataset.blockType = line.block.type
+        }
+
+        const rule = document.createElement('div')
+        rule.style.cssText = `
+            width: 100%;
+            border-top: 1px solid currentColor;
+            opacity: 0.35;
+        `
+        wrapper.appendChild(rule)
         return wrapper
     }
 
@@ -990,6 +1021,7 @@ function applyTextStyle(element: HTMLElement, style: TextStyle): void {
     if (style.fontVariant) element.style.fontVariant = style.fontVariant
     if (style.color) element.style.color = style.color
     if (style.textDecoration) element.style.textDecoration = style.textDecoration
+    if (style.verticalAlign) element.style.verticalAlign = style.verticalAlign
     if (style.letterSpacing) element.style.letterSpacing = `${style.letterSpacing}px`
 }
 
