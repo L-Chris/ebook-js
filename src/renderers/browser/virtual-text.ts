@@ -457,9 +457,25 @@ export class VirtualTextRenderer implements Renderer {
 
             for (const fragment of line.segments) {
                 const span = document.createElement('span')
-                span.textContent = fragment.text
                 if (fragment.gapBefore > 0) span.style.marginLeft = `${fragment.gapBefore}px`
-                applyTextStyle(span, { ...this.getBaseTextStyle(), ...fragment.style })
+                if (isInlineImageFragment(fragment)) {
+                    const img = document.createElement('img')
+                    img.src = fragment.source.attrs.src ?? ''
+                    img.alt = fragment.source.attrs.alt ?? ''
+                    img.style.cssText = `
+                        display: inline-block;
+                        width: ${parseCSSPixels(fragment.source.attrs['data-rebook-inline-image-width'], 11)}px;
+                        height: ${parseCSSPixels(fragment.source.attrs['data-rebook-inline-image-height'], 11)}px;
+                        max-width: 1em;
+                        max-height: 1em;
+                        vertical-align: super;
+                        object-fit: contain;
+                    `
+                    span.appendChild(img)
+                } else {
+                    span.textContent = fragment.text
+                    applyTextStyle(span, { ...this.getBaseTextStyle(), ...fragment.style })
+                }
                 lineEl.appendChild(span)
             }
 
@@ -965,6 +981,10 @@ function applyTextStyle(element: HTMLElement, style: TextStyle): void {
     if (style.color) element.style.color = style.color
     if (style.textDecoration) element.style.textDecoration = style.textDecoration
     if (style.letterSpacing) element.style.letterSpacing = `${style.letterSpacing}px`
+}
+
+function isInlineImageFragment(fragment: { source?: { nodeType?: string; attrs?: Readonly<Record<string, string>> } }): fragment is { source: { nodeType: 'img'; attrs: Readonly<Record<string, string>> } } {
+    return fragment.source?.nodeType === 'img' && Boolean(fragment.source.attrs?.src)
 }
 
 function getImageJustifyContent(image: TextImage): string {

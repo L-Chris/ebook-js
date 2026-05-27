@@ -526,6 +526,62 @@ describe('VirtualTextRenderer', () => {
         renderer.destroy()
     })
 
+    it('renders footnote marker image segments inline', async () => {
+        const container = document.createElement('div')
+        container.setAttribute('data-width', '360')
+        container.setAttribute('data-height', '120')
+        document.body.appendChild(container)
+
+        const book: Book = {
+            sections: [{
+                id: 'chapter.xhtml',
+                size: 120,
+                format: 'xhtml',
+                load: () => '',
+                getBlocks: () => [{
+                    id: 'body',
+                    type: 'paragraph',
+                    segments: [
+                        { text: 'Text before ' },
+                        {
+                            text: '\uFFFC',
+                            break: 'never',
+                            extraWidth: 11,
+                            source: {
+                                nodeType: 'img',
+                                attrs: {
+                                    src: 'test://note.png',
+                                    alt: 'note',
+                                    class: 'epub-footnote',
+                                    'data-rebook-inline-image-width': '11',
+                                    'data-rebook-inline-image-height': '11',
+                                },
+                            },
+                        },
+                        { text: ' after' },
+                    ],
+                }],
+            }],
+        }
+
+        const renderer = new VirtualTextRenderer({
+            container,
+            layout: 'paginated',
+            styles: { fontSize: '16px', lineHeight: 1.5, maxInlineSize: '280px', margin: '16px' },
+        })
+
+        await renderer.open(book)
+        await renderer.goTo(0)
+
+        const marker = container.querySelector('[data-block-type="paragraph"] img') as HTMLImageElement
+        expect(marker).toBeTruthy()
+        expect(marker.src).toBe('test://note.png')
+        expect(marker.style.width).toBe('11px')
+        expect(container.querySelector('[data-block-type="image"]')).toBeNull()
+
+        renderer.destroy()
+    })
+
     it('navigates to anchors inside a virtual text section and reports the active TOC item', async () => {
         const container = document.createElement('div')
         container.setAttribute('data-width', '360')

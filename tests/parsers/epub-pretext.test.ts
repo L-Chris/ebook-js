@@ -232,8 +232,14 @@ describe('EPUB Pretext segments', () => {
         const inlineFigure = blocks?.find(block =>
             block.type === 'image' && block.image?.originalSrc?.endsWith('image_010.jpg')
         )
+        const inlineFootnoteMarkers = blocks?.flatMap(block => block.segments).filter(segment =>
+            segment.source?.nodeType === 'img'
+            && segment.source.attrs?.class?.includes('epub-footnote')
+        ) ?? []
 
         expect(footnoteImages).toHaveLength(0)
+        expect(inlineFootnoteMarkers.length).toBeGreaterThan(0)
+        expect(inlineFootnoteMarkers[0].source?.attrs?.['data-rebook-inline-image-width']).toBe('11')
         expect(inlineFigure?.image?.width).toBe(150)
     })
 })

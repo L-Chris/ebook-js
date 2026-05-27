@@ -70,6 +70,7 @@ export interface LineSegmentRange {
     end: LayoutCursor
     text: string
     style: TextStyle
+    source?: TextSegment['source']
     gapBefore: number
     occupiedWidth: number
 }
@@ -373,6 +374,7 @@ export function layout(prepared: PreparedText, options: LayoutOptions): LineRang
                     end: rangeFragment.end,
                     text: fragment.text,
                     style: prepared.segments[segmentIndex]?.style ?? {},
+                    source: prepared.segments[segmentIndex]?.source,
                     gapBefore: fragment.gapBefore,
                     occupiedWidth: fragment.occupiedWidth,
                 }
@@ -454,6 +456,28 @@ function collectInlineSegments(node: DocumentNode, inherited: TextStyle): TextSe
         if (type === 'script' || type === 'style' || type === 'head') return
         if (type === 'br') {
             segments.push({ text: '\n', style, source: { nodeType: 'br', attrs: current.attrs } })
+            return
+        }
+
+        if (isImageNode(type, current)) {
+            const image = getImageData(current, new Set())
+            if (image && isFootnoteMarkerImage(image)) {
+                const dimensions = getFootnoteMarkerDimensions(image)
+                segments.push({
+                    text: '\uFFFC',
+                    style,
+                    break: 'never',
+                    extraWidth: dimensions.width,
+                    source: {
+                        nodeType: 'img',
+                        attrs: {
+                            ...(current.attrs ?? {}),
+                            'data-rebook-inline-image-width': String(dimensions.width),
+                            'data-rebook-inline-image-height': String(dimensions.height),
+                        },
+                    },
+                })
+            }
             return
         }
 
@@ -653,6 +677,20 @@ function isFootnoteMarkerImage(image: TextImage): boolean {
         || token === 'epub-footnote1'
         || token === 'noteref'
         || token === 'footnote-ref')
+}
+
+function getFootnoteMarkerDimensions(image: TextImage): { width: number; height: number } {
+    const role = image.role?.toLowerCase() ?? ''
+    const width = image.style?.width
+        ?? image.width
+        ?? (role.split(/\s+/).includes('epub-footnote1') ? 10 : 11)
+    const height = image.style?.height
+        ?? image.height
+        ?? width
+    return {
+        width: Math.max(1, width),
+        height: Math.max(1, height),
+    }
 }
 
 function getImageBlockMetrics(
