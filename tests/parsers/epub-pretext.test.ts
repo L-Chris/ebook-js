@@ -210,4 +210,30 @@ describe('EPUB Pretext segments', () => {
         expect(image?.image?.style?.maxWidth).toBe(320)
         expect(urlFactory.hasURL(image!.image!.src)).toBe(true)
     })
+
+    it('does not promote footnote marker images from Gui Women to block images', async () => {
+        const parser = new EPUBParser()
+        const data = await readFile('data/归我们未来经济社会的行动指南.epub')
+        const book = await parser.parse(data.buffer.slice(
+            data.byteOffset,
+            data.byteOffset + data.byteLength,
+        ), {
+            domAdapter: new NodeDOMAdapter(),
+            urlFactory: new NodeURLFactory(),
+        })
+
+        const firstChapter = book.sections.find(section => String(section.id).endsWith('Section0002.xhtml'))
+        expect(firstChapter).toBeDefined()
+
+        const blocks = await firstChapter!.getBlocks?.()
+        const footnoteImages = blocks?.filter(block =>
+            block.type === 'image' && block.image?.role?.includes('epub-footnote')
+        ) ?? []
+        const inlineFigure = blocks?.find(block =>
+            block.type === 'image' && block.image?.originalSrc?.endsWith('image_010.jpg')
+        )
+
+        expect(footnoteImages).toHaveLength(0)
+        expect(inlineFigure?.image?.width).toBe(150)
+    })
 })

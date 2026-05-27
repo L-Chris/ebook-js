@@ -159,6 +159,7 @@ export function extractDocumentBlocks(
     const pushImageBlock = (node: DocumentNode) => {
         const image = getImageData(node, coverImageSrcs)
         if (!image) return
+        if (isFootnoteMarkerImage(image)) return
         const fontSize = baseStyle.fontSize ?? DEFAULT_STYLE.fontSize
         blocks.push({
             id: node.attrs?.id ?? `image-${nextId++}`,
@@ -643,6 +644,15 @@ function getImageData(
         role: role || undefined,
         style: imageStyle,
     }
+}
+
+function isFootnoteMarkerImage(image: TextImage): boolean {
+    const role = image.role?.toLowerCase() ?? ''
+    return role.split(/\s+/).some(token =>
+        token === 'epub-footnote'
+        || token === 'epub-footnote1'
+        || token === 'noteref'
+        || token === 'footnote-ref')
 }
 
 function getImageBlockMetrics(

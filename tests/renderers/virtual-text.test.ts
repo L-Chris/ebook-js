@@ -748,6 +748,49 @@ describe('VirtualTextRenderer', () => {
         renderer.destroy()
     })
 
+    it('keeps Gui Women TOC navigation after chapter 2 on non-empty virtual pages', async () => {
+        const container = document.createElement('div')
+        container.setAttribute('data-width', '620')
+        container.setAttribute('data-height', '600')
+        document.body.appendChild(container)
+
+        const data = await readFile('data/归我们未来经济社会的行动指南.epub')
+        const book = await epub().parse(data.buffer.slice(
+            data.byteOffset,
+            data.byteOffset + data.byteLength,
+        ), {
+            domAdapter: new NodeDOMAdapter(),
+            urlFactory: new NodeURLFactory(),
+        })
+        const tocItems = book.toc?.slice(2) ?? []
+        expect(tocItems.length).toBeGreaterThan(0)
+
+        const renderer = new VirtualTextRenderer({
+            container,
+            layout: 'paginated',
+            maxColumnCount: 2,
+            styles: { fontSize: '16px', lineHeight: 1.5, maxInlineSize: '720px', margin: '32px' },
+        })
+        let currentIndex = -1
+        renderer.on('relocate', event => {
+            currentIndex = event.index
+        })
+
+        await renderer.open(book)
+        for (const item of tocItems) {
+            const resolved = book.resolveHref?.(item.href)
+            expect(resolved?.index).toBeGreaterThanOrEqual(0)
+
+            await renderer.goTo(item.href)
+
+            expect(currentIndex).toBe(resolved?.index)
+            expect(container.querySelectorAll('[data-block-type]').length).toBeGreaterThan(0)
+            expect(container.textContent?.trim()).not.toBe('')
+        }
+
+        renderer.destroy()
+    }, 10000)
+
     it('activates a TOC item that starts inside the visible paginated spread', async () => {
         const container = document.createElement('div')
         container.setAttribute('data-width', '760')
