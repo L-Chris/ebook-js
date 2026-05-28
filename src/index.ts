@@ -148,6 +148,32 @@ export {
     getVisibleLines,
 } from './core/pretext'
 
+// Search
+export {
+    searchBook,
+    searchChapters,
+    getSectionSearchText,
+} from './search'
+export type {
+    SearchScope,
+    SearchOptions,
+    SearchResult,
+    ChapterSearchResult,
+} from './search'
+
+// MCP helpers
+export {
+    createBookMCPTools,
+    callBookMCPTool,
+} from './mcp'
+export type {
+    MCPToolDefinition,
+    MCPToolCallResult,
+    BookMCPOptions,
+    SearchBookToolArgs,
+    GetChapterTextToolArgs,
+} from './mcp'
+
 // Parsers
 export { epub, EPUBParser } from './parsers/epub'
 export { cbz, CBZParser } from './parsers/cbz'

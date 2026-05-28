@@ -1,9 +1,13 @@
+import { existsSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { beforeAll, describe, expect, it, vi } from 'vitest'
 import { EPUBParser } from '../../src/parsers/epub'
 import { NodeDOMAdapter, NodeURLFactory } from '../../src/adapters/node'
 import { layout, prepare, prepareBlocks, type TextSegment } from '../../src/core/pretext'
 import { createTestEPUB } from '../fixtures/epub-fixture'
+
+const structuredWritingFixture = 'data/Structured Writing Rhetoric and Process.epub'
+const itWithStructuredWriting = existsSync(structuredWritingFixture) ? it : it.skip
 
 beforeAll(() => {
     vi.stubGlobal('OffscreenCanvas', class {
@@ -123,9 +127,9 @@ describe('EPUB Pretext segments', () => {
         expect(blockCount).toBeGreaterThan(0)
     })
 
-    it('keeps DocBook table-of-contents definition lists as list items', async () => {
+    itWithStructuredWriting('keeps DocBook table-of-contents definition lists as list items', async () => {
         const parser = new EPUBParser()
-        const data = await readFile('data/Structured Writing Rhetoric and Process.epub')
+        const data = await readFile(structuredWritingFixture)
         const book = await parser.parse(data.buffer.slice(
             data.byteOffset,
             data.byteOffset + data.byteLength,
@@ -150,9 +154,9 @@ describe('EPUB Pretext segments', () => {
         expect(listBlocks.find(block => block.segments.map(segment => segment.text).join('').includes('How Ideas Become Content'))?.depth).toBe(1)
     })
 
-    it('extracts the publisher logo image after the table of contents', async () => {
+    itWithStructuredWriting('extracts the publisher logo image after the table of contents', async () => {
         const parser = new EPUBParser()
-        const data = await readFile('data/Structured Writing Rhetoric and Process.epub')
+        const data = await readFile(structuredWritingFixture)
         const book = await parser.parse(data.buffer.slice(
             data.byteOffset,
             data.byteOffset + data.byteLength,
@@ -171,9 +175,9 @@ describe('EPUB Pretext segments', () => {
         expect(logo?.image?.alt).toBe('XML Press')
     })
 
-    it('keeps Structured Writing program listings preformatted', async () => {
+    itWithStructuredWriting('keeps Structured Writing program listings preformatted', async () => {
         const parser = new EPUBParser()
-        const data = await readFile('data/Structured Writing Rhetoric and Process.epub')
+        const data = await readFile(structuredWritingFixture)
         const book = await parser.parse(data.buffer.slice(
             data.byteOffset,
             data.byteOffset + data.byteLength,

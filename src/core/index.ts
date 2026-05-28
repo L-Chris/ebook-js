@@ -47,3 +47,14 @@ export {
     normalizeContributors,
     normalizeSubjects,
 } from './metadata'
+export {
+    searchBook,
+    searchChapters,
+    getSectionSearchText,
+} from '../search'
+export type {
+    SearchScope,
+    SearchOptions,
+    SearchResult,
+    ChapterSearchResult,
+} from '../search'

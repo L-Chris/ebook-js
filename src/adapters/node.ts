@@ -5,9 +5,12 @@
  * parsing and manipulation without a browser environment.
  */
 
+import { createRequire } from 'node:module'
 import type { DOMAdapter, XMLDocument, XMLElement, XMLAttr, XMLNode } from '../core/dom-adapter'
 import type { URLFactory } from '../core/url-factory'
 import { EBookError } from '../core/errors'
+
+const require = createRequire(import.meta.url)
 
 // xmldom types
 interface XmldomDocument {

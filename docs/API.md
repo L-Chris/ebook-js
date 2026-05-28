@@ -11,6 +11,8 @@ Complete API documentation for rebook.
 - [Section](#section)
 - [Document Model](#document-model)
 - [Pretext Layout](#pretext-layout)
+- [Search](#search)
+- [MCP Tools](#mcp-tools)
 - [Parser Interface](#parser-interface)
 - [Renderer Interface](#renderer-interface)
 - [Adapter System](#adapter-system)
@@ -19,6 +21,79 @@ Complete API documentation for rebook.
 - [Styles](#styles)
 - [Default Format Styles](#default-format-styles)
 - [Parser Detection Priority](#parser-detection-priority)
+
+---
+
+## Search
+
+`searchBook()` searches readable text from parsed books. By default it scans
+every section. Use `scope: 'chapter'` and `chapterIndex` to search within one
+chapter/section.
+
+```typescript
+import { searchBook, searchChapters } from 'rebook'
+
+const results = await searchBook(book, 'platform cooperative', {
+  maxResults: 20,
+  contextChars: 80,
+})
+
+const chapterResults = await searchBook(book, 'ownership', {
+  scope: 'chapter',
+  chapterIndex: 2,
+})
+
+const grouped = await searchChapters(book, 'worker')
+```
+
+Search prefers `section.getBlocks()` so virtual-text extraction rules are
+respected. Inline footnote markers remain searchable as markers, while hidden
+footnote content is not mixed into the visible body text.
+
+---
+
+## MCP Tools
+
+Installed packages also expose a stdio MCP server executable:
+
+```json
+{
+  "mcpServers": {
+    "book": {
+      "command": "npx",
+      "args": ["-y", "--package", "rebook", "rebook-mcp", "/absolute/path/book.epub"]
+    }
+  }
+}
+```
+
+If `rebook` is installed globally or the MCP client runs inside a project where
+`rebook` is installed, `command` can be `rebook-mcp` directly. The CLI supports
+EPUB, MOBI/AZW3, FB2, and CBZ files and exposes tools for the selected book over
+stdio.
+
+For embedding, `createBookMCPTools()` returns SDK-agnostic Model Context
+Protocol style tool definitions for a parsed `Book`. Adapters can register the
+`name`, `description`, `inputSchema`, and call `handler(args)` from any MCP
+server implementation.
+
+```typescript
+import { createBookMCPTools, callBookMCPTool } from 'rebook/mcp'
+
+const tools = createBookMCPTools(book)
+
+await callBookMCPTool(tools, 'search_book', {
+  query: 'cooperative',
+  chapterIndex: 1,
+  maxResults: 5,
+})
+```
+
+Built-in tools:
+
+- `list_chapters`: returns section indexes, ids, titles, sizes, and linear flags.
+- `search_book`: searches the whole book or one chapter via `chapterIndex`.
+- `get_chapter_text`: returns readable text for one chapter with truncation.
 
 ---
 
